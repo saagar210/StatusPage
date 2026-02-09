@@ -7,7 +7,9 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use shared::error::AppError;
-use shared::models::service::{CreateServiceRequest, ReorderServicesRequest, Service, UpdateServiceRequest};
+use shared::models::service::{
+    CreateServiceRequest, ReorderServicesRequest, Service, UpdateServiceRequest,
+};
 
 use crate::db;
 use crate::middleware::org_access::OrgAccess;
@@ -16,7 +18,12 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(create_service).get(list_services))
-        .route("/:id", get(get_service).patch(update_service).delete(delete_service))
+        .route(
+            "/:id",
+            get(get_service)
+                .patch(update_service)
+                .delete(delete_service),
+        )
         .route("/reorder", patch(reorder_services))
 }
 
@@ -37,7 +44,10 @@ async fn create_service(
     }
 
     let service = db::services::create(&state.pool, org_access.org.id, &req).await?;
-    Ok((axum::http::StatusCode::CREATED, Json(DataResponse { data: service })))
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(DataResponse { data: service }),
+    ))
 }
 
 async fn list_services(

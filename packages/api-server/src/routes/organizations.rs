@@ -1,9 +1,15 @@
-use axum::{extract::State, routing::{get, post}, Json, Router};
+use axum::{
+    extract::State,
+    routing::{get, post},
+    Json, Router,
+};
 use serde::Serialize;
 
 use shared::enums::MemberRole;
 use shared::error::AppError;
-use shared::models::organization::{CreateOrganizationRequest, Organization, UpdateOrganizationRequest};
+use shared::models::organization::{
+    CreateOrganizationRequest, Organization, UpdateOrganizationRequest,
+};
 use shared::validation::{slugify, validate_brand_color, validate_org_name, validate_slug};
 
 use crate::db;
@@ -39,7 +45,8 @@ async fn create_organization(
             // Validate generated slug still passes rules
             if validate_slug(&generated).is_err() {
                 return Err(AppError::Validation(
-                    "Could not generate a valid slug from the name. Please provide one.".to_string(),
+                    "Could not generate a valid slug from the name. Please provide one."
+                        .to_string(),
                 ));
             }
             generated
@@ -47,7 +54,10 @@ async fn create_organization(
     };
 
     if db::organizations::slug_exists(&state.pool, &slug).await? {
-        return Err(AppError::Conflict(format!("Slug '{}' is already taken", slug)));
+        return Err(AppError::Conflict(format!(
+            "Slug '{}' is already taken",
+            slug
+        )));
     }
 
     let org = db::organizations::create(&state.pool, &req, &slug).await?;
@@ -55,7 +65,10 @@ async fn create_organization(
     // Auto-add creator as owner
     db::members::create(&state.pool, org.id, current_user.user.id, MemberRole::Owner).await?;
 
-    Ok((axum::http::StatusCode::CREATED, Json(DataResponse { data: org })))
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(DataResponse { data: org }),
+    ))
 }
 
 async fn list_organizations(
@@ -69,7 +82,9 @@ async fn list_organizations(
 async fn get_organization(
     org_access: OrgAccess,
 ) -> Result<Json<DataResponse<Organization>>, AppError> {
-    Ok(Json(DataResponse { data: org_access.org }))
+    Ok(Json(DataResponse {
+        data: org_access.org,
+    }))
 }
 
 async fn update_organization(
@@ -85,10 +100,12 @@ async fn update_organization(
 
     if let Some(ref slug) = req.slug {
         validate_slug(slug)?;
-        if slug != &org_access.org.slug
-            && db::organizations::slug_exists(&state.pool, slug).await?
+        if slug != &org_access.org.slug && db::organizations::slug_exists(&state.pool, slug).await?
         {
-            return Err(AppError::Conflict(format!("Slug '{}' is already taken", slug)));
+            return Err(AppError::Conflict(format!(
+                "Slug '{}' is already taken",
+                slug
+            )));
         }
     }
 

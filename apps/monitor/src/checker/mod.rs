@@ -30,7 +30,9 @@ pub fn create_checker(config: &MonitorConfig) -> Box<dyn Checker> {
         #[cfg(feature = "ping")]
         MonitorConfig::Ping(c) => Box::new(ping::PingChecker::new(c.clone())),
         #[cfg(not(feature = "ping"))]
-        MonitorConfig::Ping(_) => Box::new(UnsupportedChecker("Ping checker not compiled (enable 'ping' feature)".to_string())),
+        MonitorConfig::Ping(_) => Box::new(UnsupportedChecker(
+            "Ping checker not compiled (enable 'ping' feature)".to_string(),
+        )),
     }
 }
 

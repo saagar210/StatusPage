@@ -41,6 +41,7 @@ dependencies = [
  "chrono",
  "dotenvy",
  "pin-project-lite",
+ "reqwest",
  "serde",
  "serde_json",
  "shared",

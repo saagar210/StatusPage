@@ -55,13 +55,11 @@ pub async fn create(
 
     // 3. Link affected services
     for service_id in &req.affected_service_ids {
-        sqlx::query(
-            "INSERT INTO incident_services (incident_id, service_id) VALUES ($1, $2)",
-        )
-        .bind(incident.id)
-        .bind(service_id)
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query("INSERT INTO incident_services (incident_id, service_id) VALUES ($1, $2)")
+            .bind(incident.id)
+            .bind(service_id)
+            .execute(&mut *tx)
+            .await?;
     }
 
     // 4. Update affected service statuses based on impact
@@ -102,13 +100,11 @@ pub async fn find_by_org(
         .await
         .unwrap_or(0)
     } else {
-        sqlx::query_scalar::<_, i64>(
-            "SELECT COUNT(*) FROM incidents WHERE org_id = $1",
-        )
-        .bind(org_id)
-        .fetch_one(pool)
-        .await
-        .unwrap_or(0)
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM incidents WHERE org_id = $1")
+            .bind(org_id)
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0)
     };
 
     let incidents = if let Some(status) = status_filter {
@@ -154,13 +150,12 @@ pub async fn find_by_id_with_details(
     incident_id: Uuid,
     org_id: Uuid,
 ) -> Result<Option<IncidentWithDetails>, AppError> {
-    let incident = sqlx::query_as::<_, Incident>(
-        "SELECT * FROM incidents WHERE id = $1 AND org_id = $2",
-    )
-    .bind(incident_id)
-    .bind(org_id)
-    .fetch_optional(pool)
-    .await?;
+    let incident =
+        sqlx::query_as::<_, Incident>("SELECT * FROM incidents WHERE id = $1 AND org_id = $2")
+            .bind(incident_id)
+            .bind(org_id)
+            .fetch_optional(pool)
+            .await?;
 
     let incident = match incident {
         Some(i) => i,
@@ -264,12 +259,11 @@ pub async fn resolve_and_recalculate(
     .await?;
 
     // Get affected services
-    let service_ids: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT service_id FROM incident_services WHERE incident_id = $1",
-    )
-    .bind(incident_id)
-    .fetch_all(&mut *tx)
-    .await?;
+    let service_ids: Vec<Uuid> =
+        sqlx::query_scalar("SELECT service_id FROM incident_services WHERE incident_id = $1")
+            .bind(incident_id)
+            .fetch_all(&mut *tx)
+            .await?;
 
     // For each affected service, recalculate status
     for service_id in service_ids {
@@ -300,13 +294,11 @@ pub async fn resolve_and_recalculate(
             None => ServiceStatus::Operational,
         };
 
-        sqlx::query(
-            "UPDATE services SET current_status = $1, updated_at = NOW() WHERE id = $2",
-        )
-        .bind(new_status)
-        .bind(service_id)
-        .execute(&mut *tx)
-        .await?;
+        sqlx::query("UPDATE services SET current_status = $1, updated_at = NOW() WHERE id = $2")
+            .bind(new_status)
+            .bind(service_id)
+            .execute(&mut *tx)
+            .await?;
     }
 
     tx.commit().await?;
@@ -315,12 +307,11 @@ pub async fn resolve_and_recalculate(
 
 pub async fn delete(pool: &PgPool, incident_id: Uuid, org_id: Uuid) -> Result<(), AppError> {
     // Get affected services before deletion for status recalculation
-    let service_ids: Vec<Uuid> = sqlx::query_scalar(
-        "SELECT service_id FROM incident_services WHERE incident_id = $1",
-    )
-    .bind(incident_id)
-    .fetch_all(pool)
-    .await?;
+    let service_ids: Vec<Uuid> =
+        sqlx::query_scalar("SELECT service_id FROM incident_services WHERE incident_id = $1")
+            .bind(incident_id)
+            .fetch_all(pool)
+            .await?;
 
     let result = sqlx::query("DELETE FROM incidents WHERE id = $1 AND org_id = $2")
         .bind(incident_id)
@@ -358,13 +349,11 @@ pub async fn delete(pool: &PgPool, incident_id: Uuid, org_id: Uuid) -> Result<()
             None => ServiceStatus::Operational,
         };
 
-        sqlx::query(
-            "UPDATE services SET current_status = $1, updated_at = NOW() WHERE id = $2",
-        )
-        .bind(new_status)
-        .bind(service_id)
-        .execute(pool)
-        .await?;
+        sqlx::query("UPDATE services SET current_status = $1, updated_at = NOW() WHERE id = $2")
+            .bind(new_status)
+            .bind(service_id)
+            .execute(pool)
+            .await?;
     }
 
     Ok(())

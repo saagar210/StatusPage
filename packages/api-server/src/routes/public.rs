@@ -203,7 +203,7 @@ async fn get_incident_history(
     .ok_or_else(|| AppError::NotFound("Status page not found".to_string()))?;
 
     let page = params.page.unwrap_or(1).max(1);
-    let per_page = params.per_page.unwrap_or(20).min(100).max(1);
+    let per_page = params.per_page.unwrap_or(20).clamp(1, 100);
     let offset = (page - 1) * per_page;
     let ninety_days_ago = Utc::now() - Duration::days(90);
 

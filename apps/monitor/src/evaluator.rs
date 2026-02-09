@@ -5,13 +5,19 @@ use sqlx::PgPool;
 use crate::checker::CheckResult;
 use crate::db;
 
-pub async fn evaluate(pool: &PgPool, monitor: &Monitor, result: &CheckResult) -> anyhow::Result<()> {
+pub async fn evaluate(
+    pool: &PgPool,
+    monitor: &Monitor,
+    result: &CheckResult,
+) -> anyhow::Result<()> {
     // 1. Insert check result
     db::insert_check(pool, monitor.id, result).await?;
 
     match result.status {
         CheckStatus::Success => handle_success(pool, monitor).await?,
-        CheckStatus::Failure | CheckStatus::Timeout => handle_failure(pool, monitor, result).await?,
+        CheckStatus::Failure | CheckStatus::Timeout => {
+            handle_failure(pool, monitor, result).await?
+        }
     }
 
     Ok(())
@@ -25,7 +31,9 @@ async fn handle_success(pool: &PgPool, monitor: &Monitor) -> anyhow::Result<()> 
 
     // Check if service is in outage and should recover
     let current_status = db::get_service_current_status(pool, monitor.service_id).await?;
-    if current_status != ServiceStatus::Operational && current_status != ServiceStatus::UnderMaintenance {
+    if current_status != ServiceStatus::Operational
+        && current_status != ServiceStatus::UnderMaintenance
+    {
         // Check if any OTHER monitors for this service are still failing
         let others_failing =
             db::get_other_failing_monitors_for_service(pool, monitor.service_id, monitor.id)
@@ -81,8 +89,7 @@ async fn handle_failure(
                 "Failure threshold reached, setting service to major outage"
             );
 
-            db::update_service_status(pool, monitor.service_id, ServiceStatus::MajorOutage)
-                .await?;
+            db::update_service_status(pool, monitor.service_id, ServiceStatus::MajorOutage).await?;
 
             // Create auto-incident if one doesn't already exist
             let has_incident = db::has_active_auto_incident(pool, monitor.service_id).await?;

@@ -1,5 +1,7 @@
 use shared::error::AppError;
-use shared::models::organization::{Organization, CreateOrganizationRequest, UpdateOrganizationRequest};
+use shared::models::organization::{
+    CreateOrganizationRequest, Organization, UpdateOrganizationRequest,
+};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -23,13 +25,12 @@ pub async fn create(
     Ok(org)
 }
 
+#[allow(dead_code)]
 pub async fn find_by_slug(pool: &PgPool, slug: &str) -> Result<Option<Organization>, AppError> {
-    let org = sqlx::query_as::<_, Organization>(
-        "SELECT * FROM organizations WHERE slug = $1",
-    )
-    .bind(slug)
-    .fetch_optional(pool)
-    .await?;
+    let org = sqlx::query_as::<_, Organization>("SELECT * FROM organizations WHERE slug = $1")
+        .bind(slug)
+        .fetch_optional(pool)
+        .await?;
 
     Ok(org)
 }
@@ -81,12 +82,11 @@ pub async fn update(
 }
 
 pub async fn slug_exists(pool: &PgPool, slug: &str) -> Result<bool, AppError> {
-    let exists = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM organizations WHERE slug = $1)",
-    )
-    .bind(slug)
-    .fetch_one(pool)
-    .await?;
+    let exists =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM organizations WHERE slug = $1)")
+            .bind(slug)
+            .fetch_one(pool)
+            .await?;
 
     Ok(exists)
 }

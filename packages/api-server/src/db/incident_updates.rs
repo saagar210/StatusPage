@@ -26,6 +26,7 @@ pub async fn create(
     Ok(update)
 }
 
+#[allow(dead_code)]
 pub async fn find_by_incident(
     pool: &PgPool,
     incident_id: Uuid,

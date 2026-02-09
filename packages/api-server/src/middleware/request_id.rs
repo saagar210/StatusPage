@@ -45,7 +45,7 @@ where
 }
 
 #[derive(Debug, Clone)]
-pub struct RequestId(pub String);
+pub struct RequestId(#[allow(dead_code)] pub String);
 
 pin_project_lite::pin_project! {
     pub struct RequestIdFuture<F> {

@@ -22,7 +22,9 @@ pub fn router() -> Router<AppState> {
         .route("/", post(create_incident).get(list_incidents))
         .route(
             "/:id",
-            get(get_incident).patch(update_incident).delete(delete_incident),
+            get(get_incident)
+                .patch(update_incident)
+                .delete(delete_incident),
         )
         .route("/:id/updates", post(create_update))
 }
@@ -81,11 +83,16 @@ async fn list_incidents(
     Query(params): Query<ListParams>,
 ) -> Result<Json<ListResponse<Vec<Incident>>>, AppError> {
     let page = params.page.unwrap_or(1).max(1);
-    let per_page = params.per_page.unwrap_or(20).min(100).max(1);
+    let per_page = params.per_page.unwrap_or(20).clamp(1, 100);
 
-    let (incidents, total) =
-        db::incidents::find_by_org(&state.pool, org_access.org.id, params.status, page, per_page)
-            .await?;
+    let (incidents, total) = db::incidents::find_by_org(
+        &state.pool,
+        org_access.org.id,
+        params.status,
+        page,
+        per_page,
+    )
+    .await?;
 
     Ok(Json(ListResponse {
         data: incidents,
@@ -102,9 +109,9 @@ async fn get_incident(
     org_access: OrgAccess,
     Path((_slug, id)): Path<(String, Uuid)>,
 ) -> Result<Json<DataResponse<IncidentWithDetails>>, AppError> {
-    let incident =
-        db::incidents::find_by_id_with_details(&state.pool, id, org_access.org.id).await?
-            .ok_or_else(|| AppError::NotFound("Incident not found".to_string()))?;
+    let incident = db::incidents::find_by_id_with_details(&state.pool, id, org_access.org.id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Incident not found".to_string()))?;
 
     Ok(Json(DataResponse { data: incident }))
 }
@@ -180,9 +187,9 @@ async fn create_update(
     }
 
     // Validate status transition
-    let incident =
-        db::incidents::find_by_id_with_details(&state.pool, id, org_access.org.id).await?
-            .ok_or_else(|| AppError::NotFound("Incident not found".to_string()))?;
+    let incident = db::incidents::find_by_id_with_details(&state.pool, id, org_access.org.id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Incident not found".to_string()))?;
 
     if !incident.incident.status.can_transition_to(&req.status) {
         return Err(AppError::Validation(format!(
@@ -192,8 +199,7 @@ async fn create_update(
     }
 
     // Create the update
-    let update =
-        db::incident_updates::create(&state.pool, id, &req, org_access.user.id).await?;
+    let update = db::incident_updates::create(&state.pool, id, &req, org_access.user.id).await?;
 
     // Also update incident status if changed
     if req.status != incident.incident.status {

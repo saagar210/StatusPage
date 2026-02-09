@@ -1,9 +1,29 @@
 use crate::error::AppError;
 
 const RESERVED_SLUGS: &[&str] = &[
-    "api", "app", "www", "admin", "dashboard", "login", "s", "status", "health", "about",
-    "pricing", "docs", "blog", "support", "help", "settings", "account", "signup", "register",
-    "new", "create", "edit", "delete",
+    "api",
+    "app",
+    "www",
+    "admin",
+    "dashboard",
+    "login",
+    "s",
+    "status",
+    "health",
+    "about",
+    "pricing",
+    "docs",
+    "blog",
+    "support",
+    "help",
+    "settings",
+    "account",
+    "signup",
+    "register",
+    "new",
+    "create",
+    "edit",
+    "delete",
 ];
 
 pub fn validate_slug(s: &str) -> Result<(), AppError> {
@@ -35,10 +55,7 @@ pub fn validate_slug(s: &str) -> Result<(), AppError> {
     }
 
     if RESERVED_SLUGS.contains(&s) {
-        return Err(AppError::Validation(format!(
-            "Slug '{}' is reserved",
-            s
-        )));
+        return Err(AppError::Validation(format!("Slug '{}' is reserved", s)));
     }
 
     Ok(())
@@ -80,13 +97,7 @@ pub fn validate_org_name(s: &str) -> Result<(), AppError> {
 pub fn slugify(name: &str) -> String {
     name.to_lowercase()
         .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() {
-                c
-            } else {
-                '-'
-            }
-        })
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
         .collect::<String>()
         .split('-')
         .filter(|s| !s.is_empty())

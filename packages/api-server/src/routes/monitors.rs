@@ -16,7 +16,12 @@ use crate::state::AppState;
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(create_monitor).get(list_monitors))
-        .route("/:id", get(get_monitor).patch(update_monitor).delete(delete_monitor))
+        .route(
+            "/:id",
+            get(get_monitor)
+                .patch(update_monitor)
+                .delete(delete_monitor),
+        )
         .route("/:id/checks", get(get_check_history))
 }
 
@@ -70,7 +75,10 @@ async fn create_monitor(
     }
 
     let monitor = db::monitors::create(&state.pool, org_access.org.id, &req).await?;
-    Ok((axum::http::StatusCode::CREATED, Json(DataResponse { data: monitor })))
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(DataResponse { data: monitor }),
+    ))
 }
 
 async fn list_monitors(
@@ -127,7 +135,7 @@ async fn get_check_history(
         .ok_or_else(|| AppError::NotFound("Monitor not found".to_string()))?;
 
     let page = params.page.unwrap_or(1).max(1);
-    let per_page = params.per_page.unwrap_or(50).min(100).max(1);
+    let per_page = params.per_page.unwrap_or(50).clamp(1, 100);
 
     let (checks, total) = db::monitors::get_check_history(&state.pool, id, page, per_page).await?;
 

@@ -1,5 +1,5 @@
 use shared::error::AppError;
-use shared::models::monitor::{Monitor, CreateMonitorRequest, UpdateMonitorRequest};
+use shared::models::monitor::{CreateMonitorRequest, Monitor, UpdateMonitorRequest};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -9,16 +9,17 @@ pub async fn create(
     req: &CreateMonitorRequest,
 ) -> Result<Monitor, AppError> {
     // Verify service belongs to org
-    let service_exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM services WHERE id = $1 AND org_id = $2)",
-    )
-    .bind(req.service_id)
-    .bind(org_id)
-    .fetch_one(pool)
-    .await?;
+    let service_exists: bool =
+        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM services WHERE id = $1 AND org_id = $2)")
+            .bind(req.service_id)
+            .bind(org_id)
+            .fetch_one(pool)
+            .await?;
 
     if !service_exists {
-        return Err(AppError::NotFound("Service not found in this organization".to_string()));
+        return Err(AppError::NotFound(
+            "Service not found in this organization".to_string(),
+        ));
     }
 
     let monitor = sqlx::query_as::<_, Monitor>(
@@ -57,13 +58,12 @@ pub async fn find_by_id(
     monitor_id: Uuid,
     org_id: Uuid,
 ) -> Result<Option<Monitor>, AppError> {
-    let monitor = sqlx::query_as::<_, Monitor>(
-        "SELECT * FROM monitors WHERE id = $1 AND org_id = $2",
-    )
-    .bind(monitor_id)
-    .bind(org_id)
-    .fetch_optional(pool)
-    .await?;
+    let monitor =
+        sqlx::query_as::<_, Monitor>("SELECT * FROM monitors WHERE id = $1 AND org_id = $2")
+            .bind(monitor_id)
+            .bind(org_id)
+            .fetch_optional(pool)
+            .await?;
 
     Ok(monitor)
 }
@@ -123,13 +123,12 @@ pub async fn get_check_history(
 ) -> Result<(Vec<shared::models::monitor::MonitorCheck>, i64), AppError> {
     let offset = (page - 1) * per_page;
 
-    let total: i64 = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM monitor_checks WHERE monitor_id = $1",
-    )
-    .bind(monitor_id)
-    .fetch_one(pool)
-    .await
-    .unwrap_or(0);
+    let total: i64 =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM monitor_checks WHERE monitor_id = $1")
+            .bind(monitor_id)
+            .fetch_one(pool)
+            .await
+            .unwrap_or(0);
 
     let checks: Vec<shared::models::monitor::MonitorCheck> = sqlx::query_as(
         r#"

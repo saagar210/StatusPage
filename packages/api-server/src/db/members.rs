@@ -26,6 +26,7 @@ pub async fn create(
     Ok(member)
 }
 
+#[allow(dead_code)]
 pub async fn find_by_org(pool: &PgPool, org_id: Uuid) -> Result<Vec<MemberWithUser>, AppError> {
     let members = sqlx::query_as::<_, MemberWithUser>(
         r#"
@@ -44,22 +45,23 @@ pub async fn find_by_org(pool: &PgPool, org_id: Uuid) -> Result<Vec<MemberWithUs
     Ok(members)
 }
 
+#[allow(dead_code)]
 pub async fn find_by_user_and_org(
     pool: &PgPool,
     user_id: Uuid,
     org_id: Uuid,
 ) -> Result<Option<Member>, AppError> {
-    let member = sqlx::query_as::<_, Member>(
-        "SELECT * FROM members WHERE user_id = $1 AND org_id = $2",
-    )
-    .bind(user_id)
-    .bind(org_id)
-    .fetch_optional(pool)
-    .await?;
+    let member =
+        sqlx::query_as::<_, Member>("SELECT * FROM members WHERE user_id = $1 AND org_id = $2")
+            .bind(user_id)
+            .bind(org_id)
+            .fetch_optional(pool)
+            .await?;
 
     Ok(member)
 }
 
+#[allow(dead_code)]
 pub async fn delete(pool: &PgPool, member_id: Uuid) -> Result<(), AppError> {
     sqlx::query("DELETE FROM members WHERE id = $1")
         .bind(member_id)

@@ -25,8 +25,7 @@ async fn main() -> anyhow::Result<()> {
 
     tracing_subscriber::fmt()
         .with_env_filter(
-            EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| EnvFilter::new(&config.log_level)),
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(&config.log_level)),
         )
         .json()
         .init();
@@ -56,7 +55,12 @@ async fn main() -> anyhow::Result<()> {
             Method::DELETE,
             Method::OPTIONS,
         ])
-        .allow_headers(axum::http::header::HeaderMap::new().keys().cloned().collect::<Vec<_>>())
+        .allow_headers(
+            axum::http::header::HeaderMap::new()
+                .keys()
+                .cloned()
+                .collect::<Vec<_>>(),
+        )
         .allow_credentials(true);
 
     let state = AppState {

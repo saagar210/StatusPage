@@ -24,8 +24,7 @@ impl FromRequestParts<AppState> for CurrentUser {
             .and_then(|v| v.to_str().ok())
             .unwrap_or("");
 
-        let session_token = extract_session_token(cookie_header)
-            .ok_or(AppError::Unauthorized)?;
+        let session_token = extract_session_token(cookie_header).ok_or(AppError::Unauthorized)?;
 
         // Query session + user from database
         let user = sqlx::query_as::<_, User>(

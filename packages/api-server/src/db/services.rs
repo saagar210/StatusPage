@@ -10,12 +10,11 @@ pub async fn create(
     req: &CreateServiceRequest,
 ) -> Result<Service, AppError> {
     // Auto-set display_order to max + 1
-    let max_order: Option<i32> = sqlx::query_scalar(
-        "SELECT MAX(display_order) FROM services WHERE org_id = $1",
-    )
-    .bind(org_id)
-    .fetch_one(pool)
-    .await?;
+    let max_order: Option<i32> =
+        sqlx::query_scalar("SELECT MAX(display_order) FROM services WHERE org_id = $1")
+            .bind(org_id)
+            .fetch_one(pool)
+            .await?;
 
     let display_order = max_order.unwrap_or(-1) + 1;
 
@@ -54,13 +53,12 @@ pub async fn find_by_id(
     service_id: Uuid,
     org_id: Uuid,
 ) -> Result<Option<Service>, AppError> {
-    let service = sqlx::query_as::<_, Service>(
-        "SELECT * FROM services WHERE id = $1 AND org_id = $2",
-    )
-    .bind(service_id)
-    .bind(org_id)
-    .fetch_optional(pool)
-    .await?;
+    let service =
+        sqlx::query_as::<_, Service>("SELECT * FROM services WHERE id = $1 AND org_id = $2")
+            .bind(service_id)
+            .bind(org_id)
+            .fetch_optional(pool)
+            .await?;
 
     Ok(service)
 }
@@ -112,11 +110,7 @@ pub async fn delete(pool: &PgPool, service_id: Uuid, org_id: Uuid) -> Result<(),
     Ok(())
 }
 
-pub async fn reorder(
-    pool: &PgPool,
-    org_id: Uuid,
-    service_ids: &[Uuid],
-) -> Result<(), AppError> {
+pub async fn reorder(pool: &PgPool, org_id: Uuid, service_ids: &[Uuid]) -> Result<(), AppError> {
     let mut tx = pool.begin().await?;
 
     for (i, service_id) in service_ids.iter().enumerate() {
@@ -134,18 +128,17 @@ pub async fn reorder(
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn update_status(
     pool: &PgPool,
     service_id: Uuid,
     status: ServiceStatus,
 ) -> Result<(), AppError> {
-    sqlx::query(
-        "UPDATE services SET current_status = $1, updated_at = NOW() WHERE id = $2",
-    )
-    .bind(status)
-    .bind(service_id)
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE services SET current_status = $1, updated_at = NOW() WHERE id = $2")
+        .bind(status)
+        .bind(service_id)
+        .execute(pool)
+        .await?;
 
     Ok(())
 }

@@ -7,11 +7,9 @@ use uuid::Uuid;
 use crate::checker::CheckResult;
 
 pub async fn get_active_monitors(pool: &PgPool) -> anyhow::Result<Vec<Monitor>> {
-    let monitors = sqlx::query_as::<_, Monitor>(
-        "SELECT * FROM monitors WHERE is_active = true",
-    )
-    .fetch_all(pool)
-    .await?;
+    let monitors = sqlx::query_as::<_, Monitor>("SELECT * FROM monitors WHERE is_active = true")
+        .fetch_all(pool)
+        .await?;
 
     Ok(monitors)
 }
@@ -77,12 +75,10 @@ pub async fn increment_failures(
 }
 
 pub async fn reset_failures(pool: &PgPool, monitor_id: Uuid) -> anyhow::Result<()> {
-    sqlx::query(
-        "UPDATE monitors SET consecutive_failures = 0, updated_at = NOW() WHERE id = $1",
-    )
-    .bind(monitor_id)
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE monitors SET consecutive_failures = 0, updated_at = NOW() WHERE id = $1")
+        .bind(monitor_id)
+        .execute(pool)
+        .await?;
 
     Ok(())
 }
@@ -92,13 +88,11 @@ pub async fn update_service_status(
     service_id: Uuid,
     status: ServiceStatus,
 ) -> anyhow::Result<()> {
-    sqlx::query(
-        "UPDATE services SET current_status = $1, updated_at = NOW() WHERE id = $2",
-    )
-    .bind(status)
-    .bind(service_id)
-    .execute(pool)
-    .await?;
+    sqlx::query("UPDATE services SET current_status = $1, updated_at = NOW() WHERE id = $2")
+        .bind(status)
+        .bind(service_id)
+        .execute(pool)
+        .await?;
 
     Ok(())
 }
@@ -107,20 +101,16 @@ pub async fn get_service_current_status(
     pool: &PgPool,
     service_id: Uuid,
 ) -> anyhow::Result<ServiceStatus> {
-    let status: ServiceStatus = sqlx::query_scalar(
-        "SELECT current_status FROM services WHERE id = $1",
-    )
-    .bind(service_id)
-    .fetch_one(pool)
-    .await?;
+    let status: ServiceStatus =
+        sqlx::query_scalar("SELECT current_status FROM services WHERE id = $1")
+            .bind(service_id)
+            .fetch_one(pool)
+            .await?;
 
     Ok(status)
 }
 
-pub async fn has_active_auto_incident(
-    pool: &PgPool,
-    service_id: Uuid,
-) -> anyhow::Result<bool> {
+pub async fn has_active_auto_incident(pool: &PgPool, service_id: Uuid) -> anyhow::Result<bool> {
     let exists: bool = sqlx::query_scalar(
         r#"
         SELECT EXISTS(
@@ -146,12 +136,10 @@ pub async fn create_auto_incident(
     let mut tx = pool.begin().await?;
 
     // Get service name
-    let service_name: String = sqlx::query_scalar(
-        "SELECT name FROM services WHERE id = $1",
-    )
-    .bind(service_id)
-    .fetch_one(&mut *tx)
-    .await?;
+    let service_name: String = sqlx::query_scalar("SELECT name FROM services WHERE id = $1")
+        .bind(service_id)
+        .fetch_one(&mut *tx)
+        .await?;
 
     let incident_id = Uuid::new_v4();
 
@@ -174,17 +162,18 @@ pub async fn create_auto_incident(
         "#,
     )
     .bind(incident_id)
-    .bind(format!("Automated monitoring detected failures: {}", error_message))
+    .bind(format!(
+        "Automated monitoring detected failures: {}",
+        error_message
+    ))
     .execute(&mut *tx)
     .await?;
 
-    sqlx::query(
-        "INSERT INTO incident_services (incident_id, service_id) VALUES ($1, $2)",
-    )
-    .bind(incident_id)
-    .bind(service_id)
-    .execute(&mut *tx)
-    .await?;
+    sqlx::query("INSERT INTO incident_services (incident_id, service_id) VALUES ($1, $2)")
+        .bind(incident_id)
+        .bind(service_id)
+        .execute(&mut *tx)
+        .await?;
 
     tx.commit().await?;
     Ok(())

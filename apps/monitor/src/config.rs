@@ -11,8 +11,7 @@ pub struct Config {
 impl Config {
     pub fn from_env() -> Result<Self> {
         Ok(Self {
-            database_url: std::env::var("DATABASE_URL")
-                .context("DATABASE_URL must be set")?,
+            database_url: std::env::var("DATABASE_URL").context("DATABASE_URL must be set")?,
             max_concurrent_checks: std::env::var("MAX_CONCURRENT_CHECKS")
                 .unwrap_or_else(|_| "50".to_string())
                 .parse()
@@ -21,8 +20,7 @@ impl Config {
                 .unwrap_or_else(|_| "60".to_string())
                 .parse()
                 .context("CONFIG_RELOAD_INTERVAL_SECS must be a number")?,
-            log_level: std::env::var("LOG_LEVEL")
-                .unwrap_or_else(|_| "info".to_string()),
+            log_level: std::env::var("LOG_LEVEL").unwrap_or_else(|_| "info".to_string()),
         })
     }
 }

@@ -42,7 +42,8 @@ impl Scheduler {
         }
 
         // Initial load
-        self.reload_monitors(&mut tasks, &semaphore, &shutdown).await;
+        self.reload_monitors(&mut tasks, &semaphore, &shutdown)
+            .await;
         tracing::info!("Scheduler started with {} monitors", tasks.len());
 
         let reload_interval = Duration::from_secs(self.config.config_reload_interval_secs);
@@ -104,8 +105,7 @@ impl Scheduler {
             }
         };
 
-        let active_ids: std::collections::HashSet<Uuid> =
-            monitors.iter().map(|m| m.id).collect();
+        let active_ids: std::collections::HashSet<Uuid> = monitors.iter().map(|m| m.id).collect();
 
         // Remove tasks for monitors that no longer exist or are disabled
         let to_remove: Vec<Uuid> = tasks
