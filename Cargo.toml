@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "packages/api-server",
+    "packages/shared",
+    "apps/monitor",
+]
+resolver = "2"
