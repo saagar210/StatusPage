@@ -53,6 +53,16 @@ pub async fn find_by_org(pool: &PgPool, org_id: Uuid) -> Result<Vec<Monitor>, Ap
     Ok(monitors)
 }
 
+pub async fn count_by_org(pool: &PgPool, org_id: Uuid) -> Result<i64, AppError> {
+    let total: i64 =
+        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM monitors WHERE org_id = $1")
+            .bind(org_id)
+            .fetch_one(pool)
+            .await?;
+
+    Ok(total)
+}
+
 pub async fn find_by_id(
     pool: &PgPool,
     monitor_id: Uuid,

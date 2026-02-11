@@ -179,6 +179,35 @@ pub enum CheckStatus {
     Timeout,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum OrganizationPlan {
+    Free,
+    Pro,
+    Team,
+}
+
+impl OrganizationPlan {
+    pub fn max_monitors(&self) -> Option<i64> {
+        match self {
+            Self::Free => Some(3),
+            Self::Pro => Some(20),
+            Self::Team => None,
+        }
+    }
+}
+
+impl fmt::Display for OrganizationPlan {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Free => write!(f, "free"),
+            Self::Pro => write!(f, "pro"),
+            Self::Team => write!(f, "team"),
+        }
+    }
+}
+
 impl fmt::Display for CheckStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -232,5 +261,12 @@ mod tests {
         assert!(MemberRole::Owner.is_admin_or_above());
         assert!(MemberRole::Admin.is_admin_or_above());
         assert!(!MemberRole::Member.is_admin_or_above());
+    }
+
+    #[test]
+    fn test_organization_plan_monitor_limits() {
+        assert_eq!(OrganizationPlan::Free.max_monitors(), Some(3));
+        assert_eq!(OrganizationPlan::Pro.max_monitors(), Some(20));
+        assert_eq!(OrganizationPlan::Team.max_monitors(), None);
     }
 }

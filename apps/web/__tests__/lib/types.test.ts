@@ -4,11 +4,14 @@ import {
   INCIDENT_STATUS_LABELS,
   INCIDENT_IMPACT_LABELS,
   INCIDENT_IMPACT_COLORS,
+  PLAN_MONITOR_LIMITS,
+  formatPlanMonitorLimit,
 } from '@/lib/types'
 import type {
   ServiceStatus,
   IncidentStatus,
   IncidentImpact,
+  OrganizationPlan,
 } from '@/lib/types'
 
 const SERVICE_STATUSES: ServiceStatus[] = [
@@ -86,5 +89,26 @@ describe('INCIDENT_IMPACT_COLORS', () => {
 
   it('has exactly the right number of keys', () => {
     expect(Object.keys(INCIDENT_IMPACT_COLORS)).toHaveLength(INCIDENT_IMPACTS.length)
+  })
+})
+
+
+const ORGANIZATION_PLANS: OrganizationPlan[] = [
+  'free',
+  'pro',
+  'team',
+]
+
+describe('PLAN_MONITOR_LIMITS', () => {
+  it('has an entry for every OrganizationPlan value', () => {
+    for (const plan of ORGANIZATION_PLANS) {
+      expect(PLAN_MONITOR_LIMITS[plan]).not.toBeUndefined()
+    }
+  })
+
+  it('formats monitor limits correctly', () => {
+    expect(formatPlanMonitorLimit('free')).toBe('3')
+    expect(formatPlanMonitorLimit('pro')).toBe('20')
+    expect(formatPlanMonitorLimit('team')).toBe('Unlimited')
   })
 })

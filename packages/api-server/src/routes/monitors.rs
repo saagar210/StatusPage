@@ -6,6 +6,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use shared::enums::OrganizationPlan;
 use shared::error::AppError;
 use shared::models::monitor::{CreateMonitorRequest, Monitor, MonitorCheck, UpdateMonitorRequest};
 
@@ -74,11 +75,30 @@ async fn create_monitor(
         }
     }
 
+    if let Some(limit) = org_access.org.plan.max_monitors() {
+        let monitor_count = db::monitors::count_by_org(&state.pool, org_access.org.id).await?;
+        if monitor_count >= limit {
+            return Err(AppError::Validation(format!(
+                "{} plan allows up to {} monitors. Upgrade to add more.",
+                plan_name(org_access.org.plan),
+                limit
+            )));
+        }
+    }
+
     let monitor = db::monitors::create(&state.pool, org_access.org.id, &req).await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(DataResponse { data: monitor }),
     ))
+}
+
+fn plan_name(plan: OrganizationPlan) -> &'static str {
+    match plan {
+        OrganizationPlan::Free => "Free",
+        OrganizationPlan::Pro => "Pro",
+        OrganizationPlan::Team => "Team",
+    }
 }
 
 async fn list_monitors(
@@ -147,4 +167,16 @@ async fn get_check_history(
             total,
         },
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plan_name_formats_for_messages() {
+        assert_eq!(plan_name(OrganizationPlan::Free), "Free");
+        assert_eq!(plan_name(OrganizationPlan::Pro), "Pro");
+        assert_eq!(plan_name(OrganizationPlan::Team), "Team");
+    }
 }
