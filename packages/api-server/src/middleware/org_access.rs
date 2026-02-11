@@ -1,6 +1,6 @@
 use axum::extract::FromRequestParts;
 use axum::http::request::Parts;
-use shared::enums::MemberRole;
+use shared::enums::{MemberRole, OrganizationPlan};
 use shared::error::AppError;
 use shared::models::organization::Organization;
 
@@ -103,7 +103,7 @@ struct OrgMemberRow {
     id: uuid::Uuid,
     name: String,
     slug: String,
-    plan: String,
+    plan: OrganizationPlan,
     logo_url: Option<String>,
     brand_color: String,
     timezone: String,

@@ -21,13 +21,15 @@ export type MonitorType = "http" | "tcp" | "dns" | "ping";
 
 export type CheckStatus = "success" | "failure" | "timeout";
 
+export type OrganizationPlan = "free" | "pro" | "team";
+
 // --- Models ---
 
 export interface Organization {
   id: string;
   name: string;
   slug: string;
-  plan: string;
+  plan: OrganizationPlan;
   logo_url: string | null;
   brand_color: string;
   timezone: string;
@@ -280,3 +282,15 @@ export const INCIDENT_IMPACT_COLORS: Record<IncidentImpact, string> = {
   major: "bg-orange-100 text-orange-800",
   critical: "bg-red-100 text-red-800",
 };
+
+
+export const PLAN_MONITOR_LIMITS: Record<OrganizationPlan, number | null> = {
+  free: 3,
+  pro: 20,
+  team: null,
+};
+
+export function formatPlanMonitorLimit(plan: OrganizationPlan): string {
+  const limit = PLAN_MONITOR_LIMITS[plan];
+  return limit === null ? "Unlimited" : String(limit);
+}

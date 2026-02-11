@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { formatPlanMonitorLimit } from "@/lib/types";
 import type { Organization } from "@/lib/types";
 
 export default function SettingsPage() {
@@ -16,17 +18,40 @@ export default function SettingsPage() {
   const [name, setName] = useState("");
   const [brandColor, setBrandColor] = useState("#3B82F6");
   const [loading, setLoading] = useState(false);
+  const [monitorCount, setMonitorCount] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadOrg() {
-      const res = await fetch(`/api/proxy/api/organizations/${slug}`);
-      if (res.ok) {
-        const body = await res.json();
-        setOrg(body.data);
-        setName(body.data.name);
-        setBrandColor(body.data.brand_color);
+      setLoadError(null);
+      try {
+        const [orgRes, monitorRes] = await Promise.all([
+          fetch(`/api/proxy/api/organizations/${slug}`),
+          fetch(`/api/proxy/api/organizations/${slug}/monitors`),
+        ]);
+
+        if (!orgRes.ok) {
+          throw new Error("Failed to load organization settings");
+        }
+
+        const orgBody = await orgRes.json();
+        setOrg(orgBody.data);
+        setName(orgBody.data.name);
+        setBrandColor(orgBody.data.brand_color);
+
+        if (monitorRes.ok) {
+          const monitorBody = await monitorRes.json();
+          setMonitorCount(monitorBody.data.length);
+        } else {
+          setMonitorCount(null);
+          toast.error("Failed to load monitor usage");
+        }
+      } catch {
+        setLoadError("Failed to load settings");
+        toast.error("Failed to load settings");
       }
     }
+
     loadOrg();
   }, [slug]);
 
@@ -55,13 +80,33 @@ export default function SettingsPage() {
   }
 
   if (!org) {
-    return <div className="text-muted-foreground">Loading...</div>;
+    return (
+      <div className="text-muted-foreground">
+        {loadError ?? "Loading..."}
+      </div>
+    );
   }
 
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-3xl font-bold">Settings</h1>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Plan & Usage</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Current plan</span>
+            <Badge variant="secondary" className="uppercase">
+              {org.plan}
+            </Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Monitors: {monitorCount ?? "..."} / {formatPlanMonitorLimit(org.plan)}
+          </p>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>Organization</CardTitle>
