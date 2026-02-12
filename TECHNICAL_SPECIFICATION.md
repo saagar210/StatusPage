@@ -1577,7 +1577,7 @@ Real-time:
 |---|------|---|----------|---------|
 | 34 | Integrate Stripe (billing service) | Phase 3 | 1.5 sprints | Subscription creation, webhook handling |
 | 35 | Add plan enforcement (per seat + features) | Phase 34 | 0.5 sprint | Team plan: unlimited monitors, per-seat pricing |
-| 36 | Implement custom domain support | Phase 35 | 1 sprint | Route //:custom-domain to /s/:slug |
+| 36 | Implement custom domain support | Phase 35 | 1 sprint | Route `https://<custom-domain>` to `/s/:slug` |
 | 37 | Build status page theme editor | Phase 35 | 1 sprint | Custom colors, fonts, layout options |
 | 38 | Add multi-region monitoring | Phase 3 | 2 sprints | Deploy monitor agents per region, aggregate results |
 | 39 | Implement audit logs (GDPR compliance) | Phase 34 | 0.5 sprint | Track all actions per user/org |
