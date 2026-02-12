@@ -602,16 +602,12 @@ Indexes:
 
 **`incident_services`** (Junction: Incidents ↔ Services)
 ```sql
-id UUID PRIMARY KEY DEFAULT gen_random_uuid()
-incident_id UUID NOT NULL (fk incidents, CASCADE)
-service_id UUID NOT NULL (fk services, CASCADE)
-created_at TIMESTAMPTZ DEFAULT NOW()
+incident_id UUID NOT NULL REFERENCES incidents(id) ON DELETE CASCADE
+service_id UUID NOT NULL REFERENCES services(id) ON DELETE CASCADE
+PRIMARY KEY (incident_id, service_id)
 
-UNIQUE (incident_id, service_id)
 Indexes:
-  idx_incident_services_incident
   idx_incident_services_service
-```
 
 **`monitors`** (Health Check Configurations)
 ```sql
