@@ -203,4 +203,4 @@ This document should be updated when:
 
 ---
 
-See full document: `/home/user/StatusPage/TECHNICAL_SPECIFICATION.md`
+See full document: `TECHNICAL_SPECIFICATION.md`
