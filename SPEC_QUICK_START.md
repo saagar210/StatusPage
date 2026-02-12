@@ -1,6 +1,6 @@
 # Technical Specification - Quick Start Guide
 
-**Full Document:** `/home/user/StatusPage/TECHNICAL_SPECIFICATION.md` (2,274 lines, 74 KB)
+**Full Document:** `TECHNICAL_SPECIFICATION.md` (2,274 lines, 74 KB)
 
 ## Jump to Section
 
