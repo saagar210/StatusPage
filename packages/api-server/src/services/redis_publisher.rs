@@ -55,9 +55,9 @@ impl RedisPublisher {
         &self,
         org_id: Uuid,
         event: ServiceStatusEvent,
-    ) -> Result<(), redis::RedisError> {
+    ) -> anyhow::Result<()> {
         let channel = format!("org:{}:service:status", org_id);
-        let payload = serde_json::to_string(&event).unwrap_or_default();
+        let payload = serde_json::to_string(&event)?;
 
         let mut conn = self.redis.clone();
         conn.publish::<_, _, ()>(channel, payload).await?;
