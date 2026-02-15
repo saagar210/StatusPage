@@ -71,6 +71,20 @@ async fn create_incident(
     let incident =
         db::incidents::create(&state.pool, org_access.org.id, &req, org_access.user.id).await?;
 
+    // Publish incident created event
+    let event = crate::services::redis_publisher::IncidentCreatedEvent {
+        incident_id: incident.id,
+        title: incident.title.clone(),
+        status: incident.status,
+        impact: incident.impact.as_str().to_string(),
+        affected_services: req.affected_service_ids.clone(),
+        timestamp: chrono::Utc::now(),
+    };
+
+    if let Err(e) = state.publisher.publish_incident_created(org_access.org.id, event).await {
+        tracing::warn!("Failed to publish incident created event: {}", e);
+    }
+
     Ok((
         axum::http::StatusCode::CREATED,
         Json(DataResponse { data: incident }),
@@ -222,6 +236,19 @@ async fn create_update(
             )
             .await?;
         }
+    }
+
+    // Publish incident updated event
+    let event = crate::services::redis_publisher::IncidentUpdatedEvent {
+        incident_id: id,
+        update_id: update.id,
+        status: req.status,
+        message: req.message.clone(),
+        timestamp: chrono::Utc::now(),
+    };
+
+    if let Err(e) = state.publisher.publish_incident_updated(org_access.org.id, event).await {
+        tracing::warn!("Failed to publish incident updated event: {}", e);
     }
 
     Ok((

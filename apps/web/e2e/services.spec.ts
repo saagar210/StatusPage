@@ -1,23 +1,25 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./fixtures/auth";
 
 // These tests require authentication and a running API server + database.
-// They serve as a template for when the full stack is running.
+// Set TEST_SESSION_TOKEN environment variable to run these tests.
+
+const skipIfNoAuth = !process.env.TEST_SESSION_TOKEN;
 
 test.describe("Services Management", () => {
-  test.skip(true, "Requires authenticated session and running API server");
+  test.skip(skipIfNoAuth, "Requires TEST_SESSION_TOKEN environment variable");
 
-  test("can create a new service", async ({ page }) => {
-    await page.goto("/dashboard/demo/services");
-    await page.getByRole("button", { name: /add service/i }).click();
-    await page.getByLabel(/name/i).fill("Test Service");
-    await page.getByLabel(/description/i).fill("A test service");
-    await page.getByRole("button", { name: /create/i }).click();
-    await expect(page.getByText("Test Service")).toBeVisible();
+  test("can create a new service", async ({ authenticatedPage }) => {
+    await authenticatedPage.goto("/dashboard/demo/services");
+    await authenticatedPage.getByRole("button", { name: /add service/i }).click();
+    await authenticatedPage.getByLabel(/name/i).fill("Test Service E2E");
+    await authenticatedPage.getByLabel(/description/i).fill("A test service from E2E");
+    await authenticatedPage.getByRole("button", { name: /create/i }).click();
+    await expect(authenticatedPage.getByText("Test Service E2E")).toBeVisible();
   });
 
-  test("can update a service status", async ({ page }) => {
-    await page.goto("/dashboard/demo/services");
-    // Would need existing service to test status change
-    await expect(page.getByText(/operational/i).first()).toBeVisible();
+  test("can view service list", async ({ authenticatedPage }) => {
+    await authenticatedPage.goto("/dashboard/demo/services");
+    // Should see services from seeded data
+    await expect(authenticatedPage.getByText(/operational/i).first()).toBeVisible();
   });
 });

@@ -3,6 +3,7 @@ use anyhow::{Context, Result};
 #[derive(Debug, Clone)]
 pub struct Config {
     pub database_url: String,
+    pub redis_url: String,
     pub api_port: u16,
     pub api_host: String,
     pub cors_origin: String,
@@ -13,6 +14,8 @@ impl Config {
     pub fn from_env() -> Result<Self> {
         Ok(Self {
             database_url: std::env::var("DATABASE_URL").context("DATABASE_URL must be set")?,
+            redis_url: std::env::var("REDIS_URL")
+                .unwrap_or_else(|_| "redis://localhost:6379".to_string()),
             api_port: std::env::var("API_PORT")
                 .unwrap_or_else(|_| "4000".to_string())
                 .parse()
