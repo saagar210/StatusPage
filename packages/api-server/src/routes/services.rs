@@ -77,7 +77,31 @@ async fn update_service(
 ) -> Result<Json<DataResponse<Service>>, AppError> {
     org_access.require_admin()?;
 
+    // Get old service to compare status
+    let old_service = db::services::find_by_id(&state.pool, id, org_access.org.id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Service not found".to_string()))?;
+
     let service = db::services::update(&state.pool, id, org_access.org.id, &req).await?;
+
+    // If status changed, publish real-time event
+    if let Some(new_status) = req.current_status {
+        if old_service.current_status != new_status {
+            let event = crate::services::redis_publisher::ServiceStatusEvent {
+                service_id: service.id,
+                service_name: service.name.clone(),
+                old_status: old_service.current_status,
+                new_status,
+                timestamp: chrono::Utc::now(),
+            };
+
+            // Publish event (don't fail request if publishing fails)
+            if let Err(e) = state.publisher.publish_service_status_change(org_access.org.id, event).await {
+                tracing::warn!("Failed to publish service status change event: {}", e);
+            }
+        }
+    }
+
     Ok(Json(DataResponse { data: service }))
 }
 
