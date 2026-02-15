@@ -2,6 +2,7 @@ mod config;
 mod db;
 mod middleware;
 mod routes;
+mod services;
 mod state;
 
 use std::time::Duration;
@@ -41,6 +42,11 @@ async fn main() -> anyhow::Result<()> {
     tracing::info!("Running migrations...");
     sqlx::migrate!("../../migrations").run(&pool).await?;
 
+    tracing::info!("Connecting to Redis...");
+    let redis_client = redis::Client::open(config.redis_url.clone())?;
+    let redis = redis::aio::ConnectionManager::new(redis_client).await?;
+    tracing::info!("Redis connection established");
+
     let cors = CorsLayer::new()
         .allow_origin(
             config
@@ -63,8 +69,12 @@ async fn main() -> anyhow::Result<()> {
         )
         .allow_credentials(true);
 
+    let publisher = services::redis_publisher::RedisPublisher::new(redis.clone());
+
     let state = AppState {
         pool,
+        redis,
+        publisher,
         config: config.clone(),
     };
 
