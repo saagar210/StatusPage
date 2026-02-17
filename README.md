@@ -108,6 +108,20 @@ pnpm run dev:web
 cargo run -p monitor
 ```
 
+### Lean Dev Mode (low disk usage)
+
+`pnpm run dev:lean` starts API + web using temporary build-cache locations and
+cleans heavy artifacts automatically on exit.
+
+```bash
+pnpm run dev:lean
+```
+
+Tradeoff:
+- Lower persistent disk usage: cleans `.next`, `target`, `.turbo`, test reports
+- Slower cold starts after each restart: build artifacts are intentionally removed
+- Keeps dependencies (`node_modules`) so reinstall is not required each run
+
 7. **Visit the app**
 
 - Landing page: http://localhost:3000
@@ -133,6 +147,16 @@ cargo fmt --all
 pnpm --filter web build
 pnpm --filter web test        # Vitest (39 tests)
 pnpm --filter web typecheck
+```
+
+### Cleanup Commands
+
+```bash
+# Remove heavy build artifacts only (keeps dependencies for faster restarts)
+pnpm run clean:heavy
+
+# Remove all reproducible local caches, including dependencies
+pnpm run clean:full
 ```
 
 ### CI

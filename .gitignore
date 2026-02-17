@@ -6,7 +6,11 @@ target/
 
 # Next.js
 .next/
+.next-lean/
 out/
+
+# Lean dev caches
+.lean-cache/
 
 # Environment
 .env
