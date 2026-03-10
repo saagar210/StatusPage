@@ -8,6 +8,7 @@ target/
 .next/
 .next-lean/
 out/
+.turbo/
 
 # Lean dev caches
 .lean-cache/
@@ -16,6 +17,7 @@ out/
 .env
 .env.local
 .env.*.local
+.env.production
 
 # IDE
 .vscode/
@@ -34,3 +36,8 @@ Thumbs.db
 coverage/
 playwright-report/
 test-results/
+.perf-results/
+backups/
+
+# Local tooling
+.cargo/

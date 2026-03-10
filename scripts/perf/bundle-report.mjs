@@ -2,22 +2,40 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import path from "node:path";
 
 function nextBundle() {
-  const manifestPath = ".next/build-manifest.json";
+  const manifestPath = "apps/web/.next/build-manifest.json";
   if (!existsSync(manifestPath)) return null;
 
   const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
   const pages = manifest.pages || {};
+  const sharedFiles = [
+    ...(manifest.rootMainFiles || []),
+    ...(manifest.polyfillFiles || []),
+    ...(manifest.lowPriorityFiles || []),
+  ];
   const pageSizes = {};
+  const uniqueSharedFiles = [...new Set(sharedFiles)];
+  let sharedTotal = 0;
+
+  for (const file of uniqueSharedFiles) {
+    const full = path.join("apps/web/.next", file.replace(/^\/?/, ""));
+    try {
+      sharedTotal += statSync(full).size;
+    } catch {}
+  }
 
   for (const [route, files] of Object.entries(pages)) {
-    let total = 0;
-    for (const file of files) {
-      const full = path.join(".next", file.replace(/^\/?/, ""));
+    let total = sharedTotal;
+    for (const file of [...new Set(files)]) {
+      const full = path.join("apps/web/.next", file.replace(/^\/?/, ""));
       try {
         total += statSync(full).size;
       } catch {}
     }
     pageSizes[route] = total;
+  }
+
+  if (Object.keys(pageSizes).length === 0) {
+    pageSizes["(shared)"] = sharedTotal;
   }
 
   return {
@@ -28,7 +46,7 @@ function nextBundle() {
 }
 
 function viteBundle() {
-  const distAssets = "dist/assets";
+  const distAssets = "apps/web/dist/assets";
   if (!existsSync(distAssets)) return null;
 
   const result = { source: "vite", totalBytes: 0, assets: {} };

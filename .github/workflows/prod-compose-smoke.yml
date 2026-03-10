@@ -1,0 +1,52 @@
+name: prod-compose-smoke
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare production env
+        run: cp .env.production.example .env.production
+
+      - name: Build production compose stack
+        run: docker compose --env-file .env.production -f docker/docker-compose.prod.yml build
+
+      - name: Start production compose stack
+        run: docker compose --env-file .env.production -f docker/docker-compose.prod.yml up -d
+
+      - name: Smoke production stack
+        run: STATUSPAGE_ENV_FILE=.env.production pnpm smoke:prod
+
+      - name: Capture compose logs on failure
+        if: failure()
+        run: docker compose --env-file .env.production -f docker/docker-compose.prod.yml logs --no-color
+
+      - name: Shut down production compose stack
+        if: always()
+        run: docker compose --env-file .env.production -f docker/docker-compose.prod.yml down -v

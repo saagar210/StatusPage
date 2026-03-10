@@ -1,0 +1,14 @@
+.git
+.github
+.next
+.turbo
+.perf-results
+.pnpm-store
+node_modules
+apps/web/.next
+apps/web/node_modules
+apps/web/playwright-report
+apps/web/test-results
+target
+coverage
+dist

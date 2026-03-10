@@ -3,8 +3,9 @@ set -euo pipefail
 
 # codex-os-managed
 max_bytes="${ASSET_MAX_BYTES:-350000}"
-if [[ ! -d public ]]; then
-  echo "No public directory found; skipping asset check."
+asset_root="apps/web/public"
+if [[ ! -d "$asset_root" ]]; then
+  echo "No web public directory found; skipping asset check."
   exit 0
 fi
 
@@ -15,6 +16,6 @@ while IFS= read -r file; do
     echo "Asset too large (>${max_bytes} bytes): $file"
     fail=1
   fi
-done < <(find public -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.webp" -o -name "*.avif" \))
+done < <(find "$asset_root" -type f \( -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.webp" -o -name "*.avif" \))
 
 exit $fail

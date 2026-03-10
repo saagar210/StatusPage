@@ -1,0 +1,139 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    env_file:
+      - ${STATUSPAGE_ENV_FILE:-../.env.production}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-statuspage}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+      POSTGRES_DB: ${POSTGRES_DB:-statuspage}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api-server
+    env_file:
+      - ${STATUSPAGE_ENV_FILE:-../.env.production}
+    command: ["migrate"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api-server
+    env_file:
+      - ${STATUSPAGE_ENV_FILE:-../.env.production}
+    environment:
+      RUN_MIGRATIONS_ONLY: "false"
+      RUN_MIGRATIONS_ON_START: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "4000:4000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4000/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
+    env_file:
+      - ${STATUSPAGE_ENV_FILE:-../.env.production}
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+      AUTH_TRUST_HOST: ${AUTH_TRUST_HOST:-true}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+    depends_on:
+      api-server:
+        condition: service_healthy
+    expose:
+      - "3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_healthy
+    environment:
+      STATUSPAGE_HOST: ${STATUSPAGE_HOST:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+  monitor:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.monitor
+    env_file:
+      - ${STATUSPAGE_ENV_FILE:-../.env.production}
+    environment:
+      RUN_MIGRATIONS_ON_START: "false"
+      HEALTHCHECK_FILE: /tmp/monitor-heartbeat
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+    cap_add:
+      - NET_RAW
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "test -f /tmp/monitor-heartbeat && test $$(($$(date +%s)-$$(stat -c %Y /tmp/monitor-heartbeat))) -lt 60"
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+  caddy-data:
+  caddy-config:

@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 
 const npmExecPath = process.env.npm_execpath;
 if (!npmExecPath) {
@@ -7,8 +7,10 @@ if (!npmExecPath) {
   process.exit(1);
 }
 
+rmSync("apps/web/.next", { recursive: true, force: true });
+
 const start = Date.now();
-const result = spawnSync(process.execPath, [npmExecPath, "run", "build"], {
+const result = spawnSync(process.execPath, [npmExecPath, "--filter", "web", "build"], {
   stdio: "inherit",
 });
 const end = Date.now();
@@ -20,7 +22,7 @@ writeFileSync(
     {
       buildMs: end - start,
       capturedAt: new Date().toISOString(),
-      command: "npm_execpath run build",
+      command: "npm_execpath --filter web build",
     },
     null,
     2,
