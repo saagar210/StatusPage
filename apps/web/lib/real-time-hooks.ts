@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-
-type ServiceStatus = "operational" | "degraded" | "offline" | "maintenance";
+import type { ServiceStatus } from "@/lib/types";
 
 interface ServiceStatusEvent {
   service_id: string;
@@ -32,7 +31,7 @@ interface IncidentUpdatedEvent {
 /**
  * Hook to subscribe to real-time service status updates for an organization
  *
- * @param orgId - Organization ID to subscribe to
+ * @param slug - Organization slug to subscribe to
  * @param onServiceStatusChange - Callback when service status changes
  * @param enabled - Whether the subscription is active (default: true)
  *
@@ -45,7 +44,7 @@ interface IncidentUpdatedEvent {
  * ```
  */
 export function useRealtimeStatus(
-  orgId: string | undefined,
+  slug: string | undefined,
   onServiceStatusChange: (event: ServiceStatusEvent) => void,
   enabled: boolean = true
 ) {
@@ -54,12 +53,12 @@ export function useRealtimeStatus(
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    if (!orgId || !enabled) {
+    if (!slug || !enabled) {
       return;
     }
 
     // Create EventSource connection to SSE endpoint
-    const eventSource = new EventSource(`/api/realtime?org_id=${orgId}`);
+    const eventSource = new EventSource(`/api/realtime?slug=${slug}`);
     eventSourceRef.current = eventSource;
 
     eventSource.addEventListener("connected", () => {
@@ -92,7 +91,7 @@ export function useRealtimeStatus(
       eventSource.close();
       setConnected(false);
     };
-  }, [orgId, enabled, onServiceStatusChange]);
+  }, [slug, enabled, onServiceStatusChange]);
 
   return { connected, error };
 }
@@ -100,7 +99,7 @@ export function useRealtimeStatus(
 /**
  * Hook to subscribe to real-time incident updates for an organization
  *
- * @param orgId - Organization ID to subscribe to
+ * @param slug - Organization slug to subscribe to
  * @param onIncidentCreated - Callback when new incident is created
  * @param onIncidentUpdated - Callback when incident is updated
  * @param enabled - Whether the subscription is active (default: true)
@@ -121,7 +120,7 @@ export function useRealtimeStatus(
  * ```
  */
 export function useRealtimeIncidents(
-  orgId: string | undefined,
+  slug: string | undefined,
   onIncidentCreated: (event: IncidentCreatedEvent) => void,
   onIncidentUpdated: (event: IncidentUpdatedEvent) => void,
   enabled: boolean = true
@@ -131,11 +130,11 @@ export function useRealtimeIncidents(
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
-    if (!orgId || !enabled) {
+    if (!slug || !enabled) {
       return;
     }
 
-    const eventSource = new EventSource(`/api/realtime?org_id=${orgId}`);
+    const eventSource = new EventSource(`/api/realtime?slug=${slug}`);
     eventSourceRef.current = eventSource;
 
     eventSource.addEventListener("connected", () => {
@@ -170,7 +169,7 @@ export function useRealtimeIncidents(
       eventSource.close();
       setConnected(false);
     };
-  }, [orgId, enabled, onIncidentCreated, onIncidentUpdated]);
+  }, [slug, enabled, onIncidentCreated, onIncidentUpdated]);
 
   return { connected, error };
 }
@@ -178,7 +177,7 @@ export function useRealtimeIncidents(
 /**
  * Generic hook for real-time organization events
  *
- * @param orgId - Organization ID
+ * @param slug - Organization slug
  * @param eventHandlers - Map of event types to handlers
  * @param enabled - Whether subscription is active
  *
@@ -192,8 +191,8 @@ export function useRealtimeIncidents(
  * ```
  */
 export function useRealtimeOrg(
-  orgId: string | undefined,
-  eventHandlers: Record<string, (data: any) => void>,
+  slug: string | undefined,
+  eventHandlers: Record<string, (data: unknown) => void>,
   enabled: boolean = true
 ) {
   const [connected, setConnected] = useState(false);
@@ -207,11 +206,11 @@ export function useRealtimeOrg(
   }, [eventHandlers]);
 
   useEffect(() => {
-    if (!orgId || !enabled) {
+    if (!slug || !enabled) {
       return;
     }
 
-    const eventSource = new EventSource(`/api/realtime?org_id=${orgId}`);
+    const eventSource = new EventSource(`/api/realtime?slug=${slug}`);
     eventSourceRef.current = eventSource;
 
     eventSource.addEventListener("connected", () => {
@@ -223,7 +222,7 @@ export function useRealtimeOrg(
     Object.keys(handlersRef.current).forEach((eventType) => {
       eventSource.addEventListener(eventType, (event) => {
         try {
-          const data = JSON.parse(event.data);
+          const data: unknown = JSON.parse(event.data);
           handlersRef.current[eventType]?.(data);
         } catch (err) {
           console.error(`[Realtime] Failed to parse ${eventType} event:`, err);
@@ -240,7 +239,7 @@ export function useRealtimeOrg(
       eventSource.close();
       setConnected(false);
     };
-  }, [orgId, enabled]);
+  }, [slug, enabled]);
 
   const close = useCallback(() => {
     eventSourceRef.current?.close();

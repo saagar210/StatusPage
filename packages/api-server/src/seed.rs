@@ -4,14 +4,13 @@ use chrono::Utc;
 use sqlx::postgres::PgPoolOptions;
 use uuid::Uuid;
 
-use shared::enums::{IncidentImpact, IncidentStatus, MemberRole, ServiceStatus};
+use shared::enums::{IncidentImpact, IncidentStatus, ServiceStatus};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     dotenvy::dotenv().ok();
 
-    let database_url =
-        std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
     println!("Connecting to database...");
     let pool = PgPoolOptions::new()
@@ -66,17 +65,42 @@ async fn main() -> anyhow::Result<()> {
     )
     .bind(org_id)
     .bind(user_id)
-    .bind(MemberRole::Owner.to_string())
+    .bind("owner")
     .execute(&pool)
     .await?;
 
     // 4. Create services
     let services = [
-        ("API", "Core REST API endpoints", "Core Infrastructure", ServiceStatus::Operational),
-        ("Web Application", "Customer-facing web app", "Core Infrastructure", ServiceStatus::Operational),
-        ("Database", "PostgreSQL primary database", "Core Infrastructure", ServiceStatus::Operational),
-        ("CDN", "Static asset delivery", "Edge Services", ServiceStatus::Operational),
-        ("Email Service", "Transactional email delivery", "Communications", ServiceStatus::DegradedPerformance),
+        (
+            "API",
+            "Core REST API endpoints",
+            "Core Infrastructure",
+            ServiceStatus::Operational,
+        ),
+        (
+            "Web Application",
+            "Customer-facing web app",
+            "Core Infrastructure",
+            ServiceStatus::Operational,
+        ),
+        (
+            "Database",
+            "PostgreSQL primary database",
+            "Core Infrastructure",
+            ServiceStatus::Operational,
+        ),
+        (
+            "CDN",
+            "Static asset delivery",
+            "Edge Services",
+            ServiceStatus::Operational,
+        ),
+        (
+            "Email Service",
+            "Transactional email delivery",
+            "Communications",
+            ServiceStatus::DegradedPerformance,
+        ),
     ];
 
     let mut service_ids = Vec::new();
@@ -91,7 +115,7 @@ async fn main() -> anyhow::Result<()> {
         .bind(name)
         .bind(desc)
         .bind(group)
-        .bind(status.to_string())
+        .bind(status.as_str())
         .bind(i as i32)
         .execute(&pool)
         .await?;
@@ -111,8 +135,8 @@ async fn main() -> anyhow::Result<()> {
     .bind(resolved_incident_id)
     .bind(org_id)
     .bind("Elevated API latency")
-    .bind(IncidentStatus::Resolved.to_string())
-    .bind(IncidentImpact::Minor.to_string())
+    .bind(IncidentStatus::Resolved.as_str())
+    .bind(IncidentImpact::Minor.as_str())
     .bind(resolved_started)
     .bind(resolved_at)
     .bind(user_id)
@@ -120,20 +144,34 @@ async fn main() -> anyhow::Result<()> {
     .await?;
 
     // Link to API service
-    sqlx::query(
-        "INSERT INTO incident_services (incident_id, service_id) VALUES ($1, $2)",
-    )
-    .bind(resolved_incident_id)
-    .bind(service_ids[0].0) // API
-    .execute(&pool)
-    .await?;
+    sqlx::query("INSERT INTO incident_services (incident_id, service_id) VALUES ($1, $2)")
+        .bind(resolved_incident_id)
+        .bind(service_ids[0].0) // API
+        .execute(&pool)
+        .await?;
 
     // Add timeline updates for resolved incident
     let updates = vec![
-        (resolved_started, IncidentStatus::Investigating, "We are investigating reports of elevated API response times."),
-        (resolved_started + chrono::Duration::minutes(10), IncidentStatus::Identified, "Root cause identified: a slow database query in the authentication path."),
-        (resolved_started + chrono::Duration::minutes(30), IncidentStatus::Monitoring, "Fix deployed. Monitoring for stability."),
-        (resolved_started + chrono::Duration::minutes(45), IncidentStatus::Resolved, "API latency has returned to normal levels. The slow query has been optimized."),
+        (
+            resolved_started,
+            IncidentStatus::Investigating,
+            "We are investigating reports of elevated API response times.",
+        ),
+        (
+            resolved_started + chrono::Duration::minutes(10),
+            IncidentStatus::Identified,
+            "Root cause identified: a slow database query in the authentication path.",
+        ),
+        (
+            resolved_started + chrono::Duration::minutes(30),
+            IncidentStatus::Monitoring,
+            "Fix deployed. Monitoring for stability.",
+        ),
+        (
+            resolved_started + chrono::Duration::minutes(45),
+            IncidentStatus::Resolved,
+            "API latency has returned to normal levels. The slow query has been optimized.",
+        ),
     ];
 
     for (time, status, message) in &updates {
@@ -142,7 +180,7 @@ async fn main() -> anyhow::Result<()> {
              VALUES ($1, $2, $3, $4, $5)",
         )
         .bind(resolved_incident_id)
-        .bind(status.to_string())
+        .bind(status.as_str())
         .bind(message)
         .bind(user_id)
         .bind(time)
@@ -162,21 +200,19 @@ async fn main() -> anyhow::Result<()> {
     .bind(active_incident_id)
     .bind(org_id)
     .bind("Email delivery delays")
-    .bind(IncidentStatus::Identified.to_string())
-    .bind(IncidentImpact::Minor.to_string())
+    .bind(IncidentStatus::Identified.as_str())
+    .bind(IncidentImpact::Minor.as_str())
     .bind(active_started)
     .bind(user_id)
     .execute(&pool)
     .await?;
 
     // Link to Email Service
-    sqlx::query(
-        "INSERT INTO incident_services (incident_id, service_id) VALUES ($1, $2)",
-    )
-    .bind(active_incident_id)
-    .bind(service_ids[4].0) // Email Service
-    .execute(&pool)
-    .await?;
+    sqlx::query("INSERT INTO incident_services (incident_id, service_id) VALUES ($1, $2)")
+        .bind(active_incident_id)
+        .bind(service_ids[4].0) // Email Service
+        .execute(&pool)
+        .await?;
 
     // Timeline updates for active incident
     sqlx::query(
@@ -184,7 +220,7 @@ async fn main() -> anyhow::Result<()> {
          VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(active_incident_id)
-    .bind(IncidentStatus::Investigating.to_string())
+    .bind(IncidentStatus::Investigating.as_str())
     .bind("We are investigating reports of delayed email delivery.")
     .bind(user_id)
     .bind(active_started)
@@ -196,7 +232,7 @@ async fn main() -> anyhow::Result<()> {
          VALUES ($1, $2, $3, $4, $5)",
     )
     .bind(active_incident_id)
-    .bind(IncidentStatus::Identified.to_string())
+    .bind(IncidentStatus::Identified.as_str())
     .bind("The issue has been identified as a backlog in our email provider's queue. We are working with them to resolve it.")
     .bind(user_id)
     .bind(active_started + chrono::Duration::minutes(30))
@@ -207,9 +243,21 @@ async fn main() -> anyhow::Result<()> {
 
     // 7. Create monitors for services
     let monitors = vec![
-        (service_ids[0].0, "http", serde_json::json!({"url": "https://api.example.com/health", "method": "GET", "expected_status": 200, "headers": {}})),
-        (service_ids[1].0, "http", serde_json::json!({"url": "https://app.example.com", "method": "GET", "expected_status": 200, "headers": {}})),
-        (service_ids[2].0, "tcp", serde_json::json!({"host": "db.example.com", "port": 5432})),
+        (
+            service_ids[0].0,
+            "http",
+            serde_json::json!({"url": "https://api.example.com/health", "method": "GET", "expected_status": 200, "headers": {}}),
+        ),
+        (
+            service_ids[1].0,
+            "http",
+            serde_json::json!({"url": "https://app.example.com", "method": "GET", "expected_status": 200, "headers": {}}),
+        ),
+        (
+            service_ids[2].0,
+            "tcp",
+            serde_json::json!({"host": "db.example.com", "port": 5432}),
+        ),
     ];
 
     for (service_id, monitor_type, config) in &monitors {

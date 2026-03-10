@@ -63,7 +63,8 @@ pub async fn update(
             slug = COALESCE($3, slug),
             brand_color = COALESCE($4, brand_color),
             timezone = COALESCE($5, timezone),
-            logo_url = COALESCE($6, logo_url),
+            logo_url = CASE WHEN $6 IS NOT NULL THEN NULLIF($6, '') ELSE logo_url END,
+            custom_domain = CASE WHEN $7 IS NOT NULL THEN NULLIF($7, '') ELSE custom_domain END,
             updated_at = NOW()
         WHERE id = $1
         RETURNING *
@@ -75,6 +76,7 @@ pub async fn update(
     .bind(&req.brand_color)
     .bind(&req.timezone)
     .bind(&req.logo_url)
+    .bind(&req.custom_domain)
     .fetch_one(pool)
     .await?;
 
@@ -87,6 +89,33 @@ pub async fn slug_exists(pool: &PgPool, slug: &str) -> Result<bool, AppError> {
             .bind(slug)
             .fetch_one(pool)
             .await?;
+
+    Ok(exists)
+}
+
+pub async fn custom_domain_exists(
+    pool: &PgPool,
+    custom_domain: &str,
+    exclude_org_id: Option<Uuid>,
+) -> Result<bool, AppError> {
+    let normalized = custom_domain
+        .trim()
+        .trim_end_matches('.')
+        .to_ascii_lowercase();
+    let exists = sqlx::query_scalar::<_, bool>(
+        r#"
+        SELECT EXISTS(
+            SELECT 1
+            FROM organizations
+            WHERE lower(custom_domain) = $1
+              AND ($2::uuid IS NULL OR id != $2)
+        )
+        "#,
+    )
+    .bind(normalized)
+    .bind(exclude_org_id)
+    .fetch_one(pool)
+    .await?;
 
     Ok(exists)
 }

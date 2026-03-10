@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,6 +16,7 @@ import { ServiceForm } from "@/components/dashboard/service-form";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import type { Service } from "@/lib/types";
+import { useRealtimeStatus } from "@/lib/real-time-hooks";
 
 export default function ServicesPage() {
   const params = useParams<{ slug: string }>();
@@ -25,7 +26,7 @@ export default function ServicesPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
 
-  async function fetchServices() {
+  const fetchServices = useCallback(async () => {
     try {
       const res = await fetch(`/api/proxy/api/organizations/${slug}/services`);
       if (res.ok) {
@@ -37,11 +38,15 @@ export default function ServicesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [slug]);
 
   useEffect(() => {
     fetchServices();
-  }, [slug]);
+  }, [fetchServices]);
+
+  useRealtimeStatus(slug, () => {
+    void fetchServices();
+  });
 
   async function handleDelete(serviceId: string) {
     if (!confirm("Are you sure you want to delete this service?")) return;

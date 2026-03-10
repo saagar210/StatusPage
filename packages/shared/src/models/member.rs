@@ -24,3 +24,14 @@ pub struct MemberWithUser {
     pub user_email: String,
     pub user_image: Option<String>,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct CreateMemberRequest {
+    pub email: String,
+    pub role: MemberRole,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateMemberRequest {
+    pub role: MemberRole,
+}

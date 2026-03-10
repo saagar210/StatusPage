@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,11 +35,9 @@ export default function IncidentDetailPage() {
   const [updateMessage, setUpdateMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  async function fetchIncident() {
+  const fetchIncident = useCallback(async () => {
     try {
-      const res = await fetch(
-        `/api/proxy/api/organizations/${slug}/incidents/${id}`,
-      );
+      const res = await fetch(`/api/proxy/api/organizations/${slug}/incidents/${id}`);
       if (res.ok) {
         const body = await res.json();
         setIncident(body.data);
@@ -49,11 +47,11 @@ export default function IncidentDetailPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [id, slug]);
 
   useEffect(() => {
     fetchIncident();
-  }, [slug, id]);
+  }, [fetchIncident]);
 
   async function handlePostUpdate(e: React.FormEvent) {
     e.preventDefault();

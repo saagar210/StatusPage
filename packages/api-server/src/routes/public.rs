@@ -1,6 +1,6 @@
 use axum::{
     extract::{Path, Query, State},
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use chrono::{Duration, Utc};
@@ -10,19 +10,43 @@ use shared::enums::{IncidentStatus, ServiceStatus};
 use shared::error::AppError;
 use shared::models::incident::Incident;
 use shared::models::incident_update::IncidentUpdate;
+use shared::models::subscriber::SubscribeRequest;
 
 use crate::state::AppState;
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/:slug/status", get(get_status))
-        .route("/:slug/incidents", get(get_incident_history))
-        .route("/:slug/uptime", get(get_uptime))
+        .route("/resolve", get(resolve_custom_domain))
+        .route("/{slug}/status", get(get_status))
+        .route("/{slug}/incidents", get(get_incident_history))
+        .route("/{slug}/uptime", get(get_uptime))
+        .route("/{slug}/subscribe", post(subscribe))
+        .route("/{slug}/subscribers/verify", get(verify_subscriber))
+        .route(
+            "/{slug}/subscribers/unsubscribe",
+            get(unsubscribe_subscriber),
+        )
 }
 
 #[derive(Serialize)]
 struct DataResponse<T: Serialize> {
     data: T,
+}
+
+#[derive(Serialize)]
+struct PublicMessageResponse {
+    message: String,
+}
+
+#[derive(Serialize)]
+struct ResolveCustomDomainResponse {
+    slug: String,
+    organization: PublicOrg,
+}
+
+#[derive(Deserialize)]
+struct ResolveHostParams {
+    host: String,
 }
 
 // --- Status endpoint ---
@@ -57,8 +81,36 @@ struct PublicIncident {
     status: IncidentStatus,
     impact: shared::enums::IncidentImpact,
     started_at: chrono::DateTime<Utc>,
+    resolved_at: Option<chrono::DateTime<Utc>>,
     updates: Vec<IncidentUpdate>,
     affected_services: Vec<String>,
+}
+
+async fn resolve_custom_domain(
+    State(state): State<AppState>,
+    Query(params): Query<ResolveHostParams>,
+) -> Result<Json<DataResponse<ResolveCustomDomainResponse>>, AppError> {
+    let host = normalize_host(&params.host)
+        .ok_or_else(|| AppError::Validation("Host is required".to_string()))?;
+
+    let org = sqlx::query_as::<_, OrgRow>(
+        "SELECT id, slug, name, logo_url, brand_color FROM organizations WHERE lower(custom_domain) = $1",
+    )
+    .bind(&host)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Status page not found".to_string()))?;
+
+    Ok(Json(DataResponse {
+        data: ResolveCustomDomainResponse {
+            slug: org.slug,
+            organization: PublicOrg {
+                name: org.name,
+                logo_url: org.logo_url,
+                brand_color: org.brand_color,
+            },
+        },
+    }))
 }
 
 async fn get_status(
@@ -67,7 +119,7 @@ async fn get_status(
 ) -> Result<Json<DataResponse<StatusResponse>>, AppError> {
     // Get org
     let org = sqlx::query_as::<_, OrgRow>(
-        "SELECT id, name, logo_url, brand_color FROM organizations WHERE slug = $1",
+        "SELECT id, slug, name, logo_url, brand_color FROM organizations WHERE slug = $1",
     )
     .bind(&slug)
     .fetch_optional(&state.pool)
@@ -124,6 +176,7 @@ async fn get_status(
             status: incident.status,
             impact: incident.impact,
             started_at: incident.started_at,
+            resolved_at: incident.resolved_at,
             updates,
             affected_services: affected,
         });
@@ -143,9 +196,132 @@ async fn get_status(
     }))
 }
 
+async fn subscribe(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    Json(req): Json<SubscribeRequest>,
+) -> Result<
+    (
+        axum::http::StatusCode,
+        Json<DataResponse<PublicMessageResponse>>,
+    ),
+    AppError,
+> {
+    let email = req.email.trim().to_lowercase();
+    if !looks_like_email(&email) {
+        return Err(AppError::Validation(
+            "Enter a valid email address".to_string(),
+        ));
+    }
+
+    let org = sqlx::query_as::<_, OrgRow>(
+        "SELECT id, slug, name, logo_url, brand_color FROM organizations WHERE slug = $1",
+    )
+    .bind(&slug)
+    .fetch_optional(&state.pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Status page not found".to_string()))?;
+
+    let verification_token = uuid::Uuid::new_v4().to_string();
+    let unsubscribe_token = uuid::Uuid::new_v4().to_string();
+    let (subscriber, needs_verification) = crate::db::subscribers::create_or_refresh_pending(
+        &state.pool,
+        org.id,
+        &email,
+        &verification_token,
+        &unsubscribe_token,
+    )
+    .await?;
+
+    if needs_verification {
+        crate::services::email_notifications::queue_subscription_verification(
+            &state.pool,
+            org.id,
+            &state.config.app_base_url,
+            &slug,
+            &org.name,
+            &subscriber.email,
+            subscriber
+                .verification_token
+                .as_deref()
+                .unwrap_or(&verification_token),
+        )
+        .await?;
+    }
+
+    let message = if subscriber.is_verified {
+        "This email is already subscribed.".to_string()
+    } else {
+        "Check your email to confirm this subscription.".to_string()
+    };
+
+    Ok((
+        axum::http::StatusCode::CREATED,
+        Json(DataResponse {
+            data: PublicMessageResponse { message },
+        }),
+    ))
+}
+
+#[derive(Deserialize)]
+struct TokenParams {
+    token: String,
+}
+
+async fn verify_subscriber(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    Query(params): Query<TokenParams>,
+) -> Result<Json<DataResponse<PublicMessageResponse>>, AppError> {
+    let org_id =
+        sqlx::query_scalar::<_, uuid::Uuid>("SELECT id FROM organizations WHERE slug = $1")
+            .bind(&slug)
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Status page not found".to_string()))?;
+
+    let subscriber = crate::db::subscribers::verify(&state.pool, org_id, &params.token)
+        .await?
+        .ok_or_else(|| {
+            AppError::Validation("Verification link is invalid or expired".to_string())
+        })?;
+
+    Ok(Json(DataResponse {
+        data: PublicMessageResponse {
+            message: format!("{} is now subscribed to updates.", subscriber.email),
+        },
+    }))
+}
+
+async fn unsubscribe_subscriber(
+    State(state): State<AppState>,
+    Path(slug): Path<String>,
+    Query(params): Query<TokenParams>,
+) -> Result<Json<DataResponse<PublicMessageResponse>>, AppError> {
+    let org_id =
+        sqlx::query_scalar::<_, uuid::Uuid>("SELECT id FROM organizations WHERE slug = $1")
+            .bind(&slug)
+            .fetch_optional(&state.pool)
+            .await?
+            .ok_or_else(|| AppError::NotFound("Status page not found".to_string()))?;
+
+    let subscriber = crate::db::subscribers::unsubscribe(&state.pool, org_id, &params.token)
+        .await?
+        .ok_or_else(|| {
+            AppError::Validation("Unsubscribe link is invalid or expired".to_string())
+        })?;
+
+    Ok(Json(DataResponse {
+        data: PublicMessageResponse {
+            message: format!("{} has been unsubscribed.", subscriber.email),
+        },
+    }))
+}
+
 #[derive(sqlx::FromRow)]
 struct OrgRow {
     id: uuid::Uuid,
+    slug: String,
     name: String,
     logo_url: Option<String>,
     brand_color: String,
@@ -166,6 +342,41 @@ fn worst_status(a: &ServiceStatus, b: &ServiceStatus) -> ServiceStatus {
     } else {
         *b
     }
+}
+
+fn looks_like_email(email: &str) -> bool {
+    let trimmed = email.trim();
+    trimmed.contains('@')
+        && trimmed.contains('.')
+        && !trimmed.starts_with('@')
+        && !trimmed.ends_with('@')
+}
+
+fn normalize_host(host: &str) -> Option<String> {
+    let candidate = host
+        .trim()
+        .trim_end_matches('.')
+        .split(',')
+        .next()
+        .unwrap_or_default()
+        .trim()
+        .to_lowercase();
+
+    if candidate.is_empty() {
+        return None;
+    }
+
+    if candidate.starts_with('[') && candidate.ends_with(']') {
+        return Some(candidate);
+    }
+
+    if let Some((hostname, port)) = candidate.rsplit_once(':') {
+        if !hostname.is_empty() && !port.is_empty() && port.chars().all(|ch| ch.is_ascii_digit()) {
+            return Some(hostname.to_string());
+        }
+    }
+
+    Some(candidate)
 }
 
 // --- Incident history endpoint ---
@@ -195,7 +406,7 @@ async fn get_incident_history(
     Query(params): Query<HistoryParams>,
 ) -> Result<Json<DataResponse<HistoryResponse>>, AppError> {
     let org = sqlx::query_as::<_, OrgRow>(
-        "SELECT id, name, logo_url, brand_color FROM organizations WHERE slug = $1",
+        "SELECT id, slug, name, logo_url, brand_color FROM organizations WHERE slug = $1",
     )
     .bind(&slug)
     .fetch_optional(&state.pool)
@@ -253,6 +464,7 @@ async fn get_incident_history(
             status: incident.status,
             impact: incident.impact,
             started_at: incident.started_at,
+            resolved_at: incident.resolved_at,
             updates,
             affected_services: affected,
         });
@@ -297,7 +509,7 @@ async fn get_uptime(
     Path(slug): Path<String>,
 ) -> Result<Json<DataResponse<UptimeResponse>>, AppError> {
     let org = sqlx::query_as::<_, OrgRow>(
-        "SELECT id, name, logo_url, brand_color FROM organizations WHERE slug = $1",
+        "SELECT id, slug, name, logo_url, brand_color FROM organizations WHERE slug = $1",
     )
     .bind(&slug)
     .fetch_optional(&state.pool)
@@ -381,6 +593,27 @@ async fn get_uptime(
             services: service_uptimes,
         },
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_host;
+
+    #[test]
+    fn normalize_host_trims_port_and_trailing_dot() {
+        assert_eq!(
+            normalize_host("Status.Example.com:443."),
+            Some("status.example.com".to_string())
+        );
+    }
+
+    #[test]
+    fn normalize_host_uses_first_forwarded_value() {
+        assert_eq!(
+            normalize_host("status.example.com:443, proxy.local"),
+            Some("status.example.com".to_string())
+        );
+    }
 }
 
 #[derive(sqlx::FromRow)]

@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:public": "playwright test public-page.spec.ts",
+    "test:e2e:auth": "bash ../../scripts/run-auth-e2e.sh"
   },
   "dependencies": {
     "@auth/pg-adapter": "^1.11.1",
@@ -28,6 +31,7 @@
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",
     "recharts": "^3.7.0",
+    "redis": "^4.7.1",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.3.6"

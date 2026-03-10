@@ -112,6 +112,75 @@ export interface MonitorCheck {
   checked_at: string;
 }
 
+export interface NotificationPreferences {
+  id: string;
+  org_id: string;
+  email_on_incident_created: boolean;
+  email_on_incident_updated: boolean;
+  email_on_incident_resolved: boolean;
+  email_on_service_status_changed: boolean;
+  webhook_on_incident_created: boolean;
+  webhook_on_incident_updated: boolean;
+  webhook_on_incident_resolved: boolean;
+  webhook_on_service_status_changed: boolean;
+  uptime_alert_threshold: number | null;
+  uptime_alert_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WebhookConfig {
+  id: string;
+  org_id: string;
+  name: string;
+  url: string;
+  event_types: string[];
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubscriberListItem {
+  id: string;
+  email: string;
+  is_verified: boolean;
+  verification_sent_at: string | null;
+  verified_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationLogEntry {
+  id: string;
+  notification_type: string;
+  recipient_type: string;
+  recipient_email: string;
+  subject: string | null;
+  status: string;
+  error_message: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  sent_at: string | null;
+  next_retry_at: string | null;
+  created_at: string;
+}
+
+export interface WebhookDeliveryEntry {
+  id: string;
+  webhook_config_id: string;
+  webhook_name: string;
+  webhook_url: string;
+  event_type: string;
+  status: string;
+  response_status_code: number | null;
+  error_message: string | null;
+  attempt_count: number;
+  max_attempts: number;
+  next_retry_at: string | null;
+  delivered_at: string | null;
+  created_at: string;
+}
+
 // --- Request DTOs ---
 
 export interface CreateOrganizationRequest {
@@ -124,7 +193,46 @@ export interface UpdateOrganizationRequest {
   slug?: string;
   brand_color?: string;
   timezone?: string;
-  logo_url?: string;
+  logo_url?: string | null;
+  custom_domain?: string | null;
+}
+
+export interface MemberWithUser {
+  id: string;
+  org_id: string;
+  user_id: string;
+  role: MemberRole;
+  created_at: string;
+  user_name: string | null;
+  user_email: string;
+  user_image: string | null;
+}
+
+export interface CreateMemberRequest {
+  email: string;
+  role: MemberRole;
+}
+
+export interface UpdateMemberRequest {
+  role: MemberRole;
+}
+
+export interface BillingSummary {
+  billing_enabled: boolean;
+  portal_enabled: boolean;
+  checkout_enabled: boolean;
+  current_plan: OrganizationPlan;
+  stripe_customer_id: string | null;
+  available_upgrades: OrganizationPlan[];
+}
+
+export interface ResolvedCustomDomain {
+  slug: string;
+  organization: {
+    name: string;
+    logo_url: string | null;
+    brand_color: string;
+  };
 }
 
 export interface CreateServiceRequest {
@@ -182,6 +290,35 @@ export interface UpdateMonitorRequest {
   is_active?: boolean;
 }
 
+export interface UpdateNotificationPreferencesRequest {
+  email_on_incident_created?: boolean;
+  email_on_incident_updated?: boolean;
+  email_on_incident_resolved?: boolean;
+  email_on_service_status_changed?: boolean;
+  webhook_on_incident_created?: boolean;
+  webhook_on_incident_updated?: boolean;
+  webhook_on_incident_resolved?: boolean;
+  webhook_on_service_status_changed?: boolean;
+  uptime_alert_threshold?: number;
+  uptime_alert_enabled?: boolean;
+}
+
+export interface CreateWebhookConfigRequest {
+  name: string;
+  url: string;
+  secret: string;
+  event_types: string[];
+  is_enabled?: boolean;
+}
+
+export interface UpdateWebhookConfigRequest {
+  name?: string;
+  url?: string;
+  secret?: string;
+  event_types?: string[];
+  is_enabled?: boolean;
+}
+
 // --- API Response shapes ---
 
 export interface ApiResponse<T> {
@@ -215,6 +352,10 @@ export interface PublicStatusResponse {
   overall_status: ServiceStatus;
   services: PublicService[];
   active_incidents: PublicIncident[];
+}
+
+export interface PublicMessageResponse {
+  message: string;
 }
 
 export interface PublicService {

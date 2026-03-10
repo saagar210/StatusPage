@@ -112,24 +112,6 @@ impl RedisPublisher {
 
         Ok(())
     }
-
-    /// Publish generic event to organization channel
-    pub async fn publish_event(
-        &self,
-        org_id: Uuid,
-        event_type: &str,
-        payload: serde_json::Value,
-    ) -> Result<(), redis::RedisError> {
-        let channel = format!("org:{}:{}", org_id, event_type);
-        let payload_str = serde_json::to_string(&payload).unwrap_or_default();
-
-        let mut conn = self.redis.clone();
-        conn.publish::<_, _, ()>(channel, payload_str).await?;
-
-        tracing::debug!("Published event: {} to org: {}", event_type, org_id);
-
-        Ok(())
-    }
 }
 
 #[cfg(test)]

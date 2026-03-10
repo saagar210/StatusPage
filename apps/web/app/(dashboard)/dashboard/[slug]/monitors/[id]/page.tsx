@@ -28,11 +28,10 @@ export default function MonitorDetailPage() {
 
   const fetchData = useCallback(async () => {
     try {
+      const monitorPath = `/api/proxy/api/organizations/${params.slug}/monitors/${params.id}`;
       const [monitorRes, checksRes] = await Promise.all([
-        fetch(`/api/proxy/organizations/${params.slug}/monitors/${params.id}`),
-        fetch(
-          `/api/proxy/organizations/${params.slug}/monitors/${params.id}/checks?per_page=50`
-        ),
+        fetch(monitorPath),
+        fetch(`${monitorPath}/checks?per_page=50`),
       ]);
 
       if (!monitorRes.ok) {

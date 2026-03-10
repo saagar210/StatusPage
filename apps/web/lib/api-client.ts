@@ -18,13 +18,28 @@ import type {
   CreateMonitorRequest,
   UpdateMonitorRequest,
   MonitorCheck,
+  NotificationPreferences,
+  UpdateNotificationPreferencesRequest,
+  WebhookConfig,
+  WebhookDeliveryEntry,
+  CreateWebhookConfigRequest,
+  UpdateWebhookConfigRequest,
+  SubscriberListItem,
+  NotificationLogEntry,
   PublicStatusResponse,
+  PublicMessageResponse,
   PublicIncident,
+  ResolvedCustomDomain,
   UptimeResponse,
 } from "./types";
 
 const INTERNAL_API_URL =
   process.env.INTERNAL_API_URL || "http://localhost:4000";
+
+interface PublicIncidentHistoryPayload {
+  incidents: PublicIncident[];
+  pagination: ApiListResponse<PublicIncident>["pagination"];
+}
 
 class ApiClientError extends Error {
   constructor(
@@ -329,6 +344,135 @@ export async function getMonitorChecks(
   );
 }
 
+// --- Notifications ---
+
+export async function getNotificationPreferences(
+  slug: string,
+): Promise<NotificationPreferences> {
+  const res = await fetchApi<ApiResponse<NotificationPreferences>>(
+    `/api/organizations/${slug}/notifications/preferences`,
+  );
+  return res.data;
+}
+
+export async function updateNotificationPreferences(
+  slug: string,
+  data: UpdateNotificationPreferencesRequest,
+): Promise<NotificationPreferences> {
+  const res = await fetchApi<ApiResponse<NotificationPreferences>>(
+    `/api/organizations/${slug}/notifications/preferences`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    },
+  );
+  return res.data;
+}
+
+export async function getWebhookConfigs(slug: string): Promise<WebhookConfig[]> {
+  const res = await fetchApi<ApiResponse<WebhookConfig[]>>(
+    `/api/organizations/${slug}/notifications/webhooks`,
+  );
+  return res.data;
+}
+
+export async function createWebhookConfig(
+  slug: string,
+  data: CreateWebhookConfigRequest,
+): Promise<WebhookConfig> {
+  const res = await fetchApi<ApiResponse<WebhookConfig>>(
+    `/api/organizations/${slug}/notifications/webhooks`,
+    {
+      method: "POST",
+      body: JSON.stringify(data),
+    },
+  );
+  return res.data;
+}
+
+export async function updateWebhookConfig(
+  slug: string,
+  webhookId: string,
+  data: UpdateWebhookConfigRequest,
+): Promise<WebhookConfig> {
+  const res = await fetchApi<ApiResponse<WebhookConfig>>(
+    `/api/organizations/${slug}/notifications/webhooks/${webhookId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    },
+  );
+  return res.data;
+}
+
+export async function deleteWebhookConfig(
+  slug: string,
+  webhookId: string,
+): Promise<void> {
+  await fetchApi(`/api/organizations/${slug}/notifications/webhooks/${webhookId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function getSubscribers(slug: string): Promise<SubscriberListItem[]> {
+  const res = await fetchApi<ApiResponse<SubscriberListItem[]>>(
+    `/api/organizations/${slug}/notifications/subscribers`,
+  );
+  return res.data;
+}
+
+export async function deleteSubscriber(
+  slug: string,
+  subscriberId: string,
+): Promise<void> {
+  await fetchApi(`/api/organizations/${slug}/notifications/subscribers/${subscriberId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function resendSubscriberVerification(
+  slug: string,
+  subscriberId: string,
+): Promise<{ message: string }> {
+  const res = await fetchApi<ApiResponse<{ message: string }>>(
+    `/api/organizations/${slug}/notifications/subscribers/${subscriberId}/resend`,
+    {
+      method: "POST",
+    },
+  );
+  return res.data;
+}
+
+export async function getEmailDeliveries(
+  slug: string,
+  params?: { page?: number; per_page?: number; status?: string },
+): Promise<ApiListResponse<NotificationLogEntry>> {
+  const searchParams = new URLSearchParams();
+  if (params?.page) searchParams.set("page", String(params.page));
+  if (params?.per_page) searchParams.set("per_page", String(params.per_page));
+  if (params?.status) searchParams.set("status", params.status);
+  const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+
+  return fetchApi<ApiListResponse<NotificationLogEntry>>(
+    `/api/organizations/${slug}/notifications/deliveries/email${query}`,
+  );
+}
+
+export async function getWebhookDeliveries(
+  slug: string,
+  params?: { page?: number; per_page?: number; status?: string },
+): Promise<ApiListResponse<WebhookDeliveryEntry>> {
+  const searchParams = new URLSearchParams();
+  if (params?.page) searchParams.set("page", String(params.page));
+  if (params?.per_page) searchParams.set("per_page", String(params.per_page));
+  if (params?.status) searchParams.set("status", params.status);
+  const query = searchParams.toString() ? `?${searchParams.toString()}` : "";
+
+  return fetchApi<ApiListResponse<WebhookDeliveryEntry>>(
+    `/api/organizations/${slug}/notifications/deliveries/webhooks${query}`,
+  );
+}
+
 // --- Public API ---
 
 export async function getPublicStatus(
@@ -352,9 +496,58 @@ export async function getPublicIncidents(
   page = 1,
   perPage = 20,
 ): Promise<ApiListResponse<PublicIncident>> {
-  return fetchApi<ApiListResponse<PublicIncident>>(
+  const res = await fetchApi<ApiResponse<PublicIncidentHistoryPayload>>(
     `/api/public/${slug}/incidents?page=${page}&per_page=${perPage}`,
   );
+
+  return {
+    data: res.data.incidents,
+    pagination: res.data.pagination,
+  };
+}
+
+export async function resolveCustomDomain(
+  host: string,
+): Promise<ResolvedCustomDomain> {
+  const searchParams = new URLSearchParams({ host });
+  const res = await fetchApi<ApiResponse<ResolvedCustomDomain>>(
+    `/api/public/resolve?${searchParams.toString()}`,
+  );
+  return res.data;
+}
+
+export async function subscribeToPublicStatus(
+  slug: string,
+  email: string,
+): Promise<PublicMessageResponse> {
+  const res = await fetchApi<ApiResponse<PublicMessageResponse>>(
+    `/api/public/${slug}/subscribe`,
+    {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    },
+  );
+  return res.data;
+}
+
+export async function verifyPublicSubscriber(
+  slug: string,
+  token: string,
+): Promise<PublicMessageResponse> {
+  const res = await fetchApi<ApiResponse<PublicMessageResponse>>(
+    `/api/public/${slug}/subscribers/verify?token=${encodeURIComponent(token)}`,
+  );
+  return res.data;
+}
+
+export async function unsubscribePublicSubscriber(
+  slug: string,
+  token: string,
+): Promise<PublicMessageResponse> {
+  const res = await fetchApi<ApiResponse<PublicMessageResponse>>(
+    `/api/public/${slug}/subscribers/unsubscribe?token=${encodeURIComponent(token)}`,
+  );
+  return res.data;
 }
 
 export { ApiClientError };

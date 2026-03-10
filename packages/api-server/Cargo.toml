@@ -7,7 +7,7 @@ edition = "2021"
 shared = { path = "../shared" }
 axum = { version = "0.8", features = ["macros"] }
 tokio = { version = "1", features = ["full"] }
-sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "migrate"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "migrate", "json"] }
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
@@ -21,9 +21,12 @@ thiserror = "2"
 tower = "0.5"
 pin-project-lite = "0.2"
 redis = { version = "0.27", features = ["tokio-comp", "connection-manager"] }
-
-[dev-dependencies]
 reqwest = { version = "0.12", features = ["json"] }
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+lettre = { version = "0.11", default-features = false, features = ["smtp-transport", "builder", "tokio1-rustls-tls"] }
+[dev-dependencies]
 
 [[bin]]
 name = "api-server"
@@ -32,3 +35,7 @@ path = "src/main.rs"
 [[bin]]
 name = "seed"
 path = "src/seed.rs"
+
+[[bin]]
+name = "migrate"
+path = "src/bin/migrate.rs"

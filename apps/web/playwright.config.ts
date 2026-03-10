@@ -24,7 +24,8 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "pnpm dev",
+    command:
+      "AUTH_SECRET=playwright-secret AUTH_GITHUB_ID=playwright AUTH_GITHUB_SECRET=playwright pnpm dev",
     url: "http://localhost:3000",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000, // 2 minutes to start

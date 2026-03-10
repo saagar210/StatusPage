@@ -18,12 +18,12 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(create_monitor).get(list_monitors))
         .route(
-            "/:id",
+            "/{id}",
             get(get_monitor)
                 .patch(update_monitor)
                 .delete(delete_monitor),
         )
-        .route("/:id/checks", get(get_check_history))
+        .route("/{id}/checks", get(get_check_history))
 }
 
 #[derive(Serialize)]

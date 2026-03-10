@@ -1,10 +1,27 @@
 import Link from "next/link";
+import { resolveCustomDomainFromHeaders } from "@/lib/custom-domain";
 
-export default function MarketingLayout({
+export default async function MarketingLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const resolvedCustomDomain = await resolveCustomDomainFromHeaders();
+
+  if (resolvedCustomDomain) {
+    return (
+      <div className="min-h-screen bg-background">
+        {children}
+        <footer className="border-t py-6 text-center text-sm text-muted-foreground">
+          Powered by{" "}
+          <Link href="/" className="underline hover:text-foreground">
+            StatusPage.sh
+          </Link>
+        </footer>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b">

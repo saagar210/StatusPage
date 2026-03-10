@@ -19,7 +19,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(create_service).get(list_services))
         .route(
-            "/:id",
+            "/{id}",
             get(get_service)
                 .patch(update_service)
                 .delete(delete_service),
@@ -96,8 +96,54 @@ async fn update_service(
             };
 
             // Publish event (don't fail request if publishing fails)
-            if let Err(e) = state.publisher.publish_service_status_change(org_access.org.id, event).await {
+            if let Err(e) = state
+                .publisher
+                .publish_service_status_change(org_access.org.id, event)
+                .await
+            {
                 tracing::warn!("Failed to publish service status change event: {}", e);
+            }
+
+            let payload = serde_json::json!({
+                "event_type": "service.status_changed",
+                "org_id": org_access.org.id,
+                "occurred_at": chrono::Utc::now(),
+                "data": {
+                    "service_id": service.id,
+                    "service_name": service.name.clone(),
+                    "old_status": old_service.current_status,
+                    "new_status": new_status,
+                }
+            });
+            if let Err(error) = db::webhook_deliveries::enqueue_for_event(
+                &state.pool,
+                org_access.org.id,
+                "service.status_changed",
+                &payload,
+            )
+            .await
+            {
+                tracing::warn!(
+                    error = %error,
+                    "Failed to queue service status webhook deliveries"
+                );
+            }
+
+            if let Err(error) = crate::services::email_notifications::queue_service_status_changed(
+                &state.pool,
+                org_access.org.id,
+                &state.config.app_base_url,
+                &org_access.org.slug,
+                &service.name,
+                old_service.current_status,
+                new_status,
+            )
+            .await
+            {
+                tracing::warn!(
+                    error = %error,
+                    "Failed to queue service status subscriber emails"
+                );
             }
         }
     }

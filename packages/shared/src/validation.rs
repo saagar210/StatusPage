@@ -93,6 +93,61 @@ pub fn validate_org_name(s: &str) -> Result<(), AppError> {
     Ok(())
 }
 
+pub fn validate_timezone(s: &str) -> Result<(), AppError> {
+    let trimmed = s.trim();
+    if trimmed.is_empty() || trimmed.len() > 120 {
+        return Err(AppError::Validation(
+            "Timezone must be between 1 and 120 characters".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+pub fn validate_custom_domain(s: &str) -> Result<(), AppError> {
+    let trimmed = s.trim().trim_end_matches('.').to_ascii_lowercase();
+    if trimmed.is_empty() {
+        return Ok(());
+    }
+
+    if trimmed.len() > 253 {
+        return Err(AppError::Validation(
+            "Custom domain must be 253 characters or fewer".to_string(),
+        ));
+    }
+
+    if !trimmed.contains('.') {
+        return Err(AppError::Validation(
+            "Custom domain must include at least one dot".to_string(),
+        ));
+    }
+
+    for label in trimmed.split('.') {
+        if label.is_empty() || label.len() > 63 {
+            return Err(AppError::Validation(
+                "Custom domain labels must be between 1 and 63 characters".to_string(),
+            ));
+        }
+
+        if label.starts_with('-') || label.ends_with('-') {
+            return Err(AppError::Validation(
+                "Custom domain labels must not start or end with a hyphen".to_string(),
+            ));
+        }
+
+        if !label
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        {
+            return Err(AppError::Validation(
+                "Custom domain must contain only lowercase letters, numbers, dots, and hyphens"
+                    .to_string(),
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 /// Generate a slug from an organization name.
 pub fn slugify(name: &str) -> String {
     name.to_lowercase()
@@ -153,6 +208,20 @@ mod tests {
     fn test_invalid_org_names() {
         assert!(validate_org_name("").is_err());
         assert!(validate_org_name("   ").is_err());
+    }
+
+    #[test]
+    fn test_valid_custom_domains() {
+        assert!(validate_custom_domain("").is_ok());
+        assert!(validate_custom_domain("status.example.com").is_ok());
+        assert!(validate_custom_domain("ops-1.example.co").is_ok());
+    }
+
+    #[test]
+    fn test_invalid_custom_domains() {
+        assert!(validate_custom_domain("localhost").is_err());
+        assert!(validate_custom_domain("-bad.example.com").is_err());
+        assert!(validate_custom_domain("bad_domain.example.com").is_err());
     }
 
     #[test]

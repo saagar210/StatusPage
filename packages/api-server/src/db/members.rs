@@ -26,7 +26,6 @@ pub async fn create(
     Ok(member)
 }
 
-#[allow(dead_code)]
 pub async fn find_by_org(pool: &PgPool, org_id: Uuid) -> Result<Vec<MemberWithUser>, AppError> {
     let members = sqlx::query_as::<_, MemberWithUser>(
         r#"
@@ -45,7 +44,6 @@ pub async fn find_by_org(pool: &PgPool, org_id: Uuid) -> Result<Vec<MemberWithUs
     Ok(members)
 }
 
-#[allow(dead_code)]
 pub async fn find_by_user_and_org(
     pool: &PgPool,
     user_id: Uuid,
@@ -61,12 +59,61 @@ pub async fn find_by_user_and_org(
     Ok(member)
 }
 
-#[allow(dead_code)]
-pub async fn delete(pool: &PgPool, member_id: Uuid) -> Result<(), AppError> {
-    sqlx::query("DELETE FROM members WHERE id = $1")
+pub async fn find_by_id(pool: &PgPool, member_id: Uuid) -> Result<Option<Member>, AppError> {
+    let member = sqlx::query_as::<_, Member>("SELECT * FROM members WHERE id = $1")
+        .bind(member_id)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(member)
+}
+
+pub async fn update_role(
+    pool: &PgPool,
+    org_id: Uuid,
+    member_id: Uuid,
+    role: MemberRole,
+) -> Result<Member, AppError> {
+    let member = sqlx::query_as::<_, Member>(
+        r#"
+        UPDATE members
+        SET role = $3
+        WHERE org_id = $1 AND id = $2
+        RETURNING *
+        "#,
+    )
+    .bind(org_id)
+    .bind(member_id)
+    .bind(role)
+    .fetch_optional(pool)
+    .await?
+    .ok_or_else(|| AppError::NotFound("Member not found".to_string()))?;
+
+    Ok(member)
+}
+
+pub async fn count_by_role(pool: &PgPool, org_id: Uuid, role: MemberRole) -> Result<i64, AppError> {
+    let count = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM members WHERE org_id = $1 AND role = $2",
+    )
+    .bind(org_id)
+    .bind(role)
+    .fetch_one(pool)
+    .await?;
+
+    Ok(count)
+}
+
+pub async fn delete_scoped(pool: &PgPool, org_id: Uuid, member_id: Uuid) -> Result<(), AppError> {
+    let result = sqlx::query("DELETE FROM members WHERE org_id = $1 AND id = $2")
+        .bind(org_id)
         .bind(member_id)
         .execute(pool)
         .await?;
+
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("Member not found".to_string()));
+    }
 
     Ok(())
 }

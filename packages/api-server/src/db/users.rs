@@ -12,3 +12,12 @@ pub async fn find_by_id(pool: &PgPool, user_id: Uuid) -> Result<Option<User>, Ap
 
     Ok(user)
 }
+
+pub async fn find_by_email(pool: &PgPool, email: &str) -> Result<Option<User>, AppError> {
+    let user = sqlx::query_as::<_, User>(r#"SELECT * FROM users WHERE lower(email) = lower($1)"#)
+        .bind(email)
+        .fetch_optional(pool)
+        .await?;
+
+    Ok(user)
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { Incident } from "@/lib/types";
 import { INCIDENT_STATUS_LABELS, INCIDENT_IMPACT_LABELS } from "@/lib/types";
+import { useRealtimeIncidents } from "@/lib/real-time-hooks";
 
 const impactColors: Record<string, string> = {
   none: "bg-gray-100 text-gray-700",
@@ -25,24 +26,35 @@ export default function IncidentsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetch_() {
-      try {
-        const res = await fetch(
-          `/api/proxy/api/organizations/${slug}/incidents?per_page=50`,
-        );
-        if (res.ok) {
-          const body = await res.json();
-          setIncidents(body.data);
-        }
-      } catch {
-        toast.error("Failed to load incidents");
-      } finally {
-        setLoading(false);
+  const fetchIncidents = useCallback(async () => {
+    try {
+      const res = await fetch(
+        `/api/proxy/api/organizations/${slug}/incidents?per_page=50`,
+      );
+      if (res.ok) {
+        const body = await res.json();
+        setIncidents(body.data);
       }
+    } catch {
+      toast.error("Failed to load incidents");
+    } finally {
+      setLoading(false);
     }
-    fetch_();
   }, [slug]);
+
+  useEffect(() => {
+    void fetchIncidents();
+  }, [fetchIncidents]);
+
+  useRealtimeIncidents(
+    slug,
+    () => {
+      void fetchIncidents();
+    },
+    () => {
+      void fetchIncidents();
+    },
+  );
 
   const active = incidents.filter((i) => i.status !== "resolved");
   const resolved = incidents.filter((i) => i.status === "resolved");

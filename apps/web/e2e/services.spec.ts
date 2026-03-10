@@ -10,16 +10,26 @@ test.describe("Services Management", () => {
 
   test("can create a new service", async ({ authenticatedPage }) => {
     await authenticatedPage.goto("/dashboard/demo/services");
+    await expect(
+      authenticatedPage.getByRole("heading", { name: "Services" }),
+    ).toBeVisible();
     await authenticatedPage.getByRole("button", { name: /add service/i }).click();
     await authenticatedPage.getByLabel(/name/i).fill("Test Service E2E");
     await authenticatedPage.getByLabel(/description/i).fill("A test service from E2E");
-    await authenticatedPage.getByRole("button", { name: /create/i }).click();
+    await authenticatedPage
+      .getByRole("button", { name: /create service/i })
+      .click();
     await expect(authenticatedPage.getByText("Test Service E2E")).toBeVisible();
   });
 
   test("can view service list", async ({ authenticatedPage }) => {
     await authenticatedPage.goto("/dashboard/demo/services");
-    // Should see services from seeded data
-    await expect(authenticatedPage.getByText(/operational/i).first()).toBeVisible();
+    await expect(
+      authenticatedPage.getByRole("heading", { name: "Services" }),
+    ).toBeVisible();
+    await expect(
+      authenticatedPage.getByText("API", { exact: true }),
+    ).toBeVisible();
+    await expect(authenticatedPage.getByText("Email Service")).toBeVisible();
   });
 });

@@ -1,4 +1,4 @@
-import { test as base } from "@playwright/test";
+import { test as base, type Page } from "@playwright/test";
 
 /**
  * Extended test fixtures with authentication support.
@@ -12,11 +12,14 @@ import { test as base } from "@playwright/test";
  */
 
 type AuthFixtures = {
-  authenticatedPage: any;
+  authenticatedPage: Page;
 };
 
 export const test = base.extend<AuthFixtures>({
-  authenticatedPage: async ({ page }, use) => {
+  authenticatedPage: async (
+    { page }: { page: Page },
+    usePage: (page: Page) => Promise<void>
+  ) => {
     // In a full implementation, we'd:
     // 1. Create a test user via API
     // 2. Get session token
@@ -46,7 +49,7 @@ export const test = base.extend<AuthFixtures>({
       );
     }
 
-    await use(page);
+    await usePage(page);
   },
 });
 

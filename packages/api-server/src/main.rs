@@ -16,6 +16,8 @@ use tracing_subscriber::EnvFilter;
 use crate::config::Config;
 use crate::middleware::request_id::RequestIdLayer;
 use crate::routes::api_router;
+use crate::services::email_dispatcher;
+use crate::services::webhook_dispatcher;
 use crate::state::AppState;
 
 #[tokio::main]
@@ -39,8 +41,17 @@ async fn main() -> anyhow::Result<()> {
         .connect(&config.database_url)
         .await?;
 
-    tracing::info!("Running migrations...");
-    sqlx::migrate!("../../migrations").run(&pool).await?;
+    if config.run_migrations_on_start || config.run_migrations_only {
+        tracing::info!("Running migrations...");
+        sqlx::migrate!("../../migrations").run(&pool).await?;
+    } else {
+        tracing::info!("Skipping automatic migrations on startup");
+    }
+
+    if config.run_migrations_only {
+        tracing::info!("Migration-only mode complete");
+        return Ok(());
+    }
 
     tracing::info!("Connecting to Redis...");
     let redis_client = redis::Client::open(config.redis_url.clone())?;
@@ -77,6 +88,9 @@ async fn main() -> anyhow::Result<()> {
         publisher,
         config: config.clone(),
     };
+
+    webhook_dispatcher::spawn(state.pool.clone(), config.clone());
+    email_dispatcher::spawn(state.pool.clone(), config.clone());
 
     let app = api_router(state)
         .layer(TraceLayer::new_for_http())

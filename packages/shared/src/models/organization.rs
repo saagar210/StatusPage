@@ -32,4 +32,5 @@ pub struct UpdateOrganizationRequest {
     pub brand_color: Option<String>,
     pub timezone: Option<String>,
     pub logo_url: Option<String>,
+    pub custom_domain: Option<String>,
 }

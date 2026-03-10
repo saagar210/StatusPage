@@ -1,4 +1,5 @@
 use axum::extract::FromRequestParts;
+use axum::extract::OriginalUri;
 use axum::http::request::Parts;
 use shared::enums::{MemberRole, OrganizationPlan};
 use shared::error::AppError;
@@ -50,6 +51,12 @@ impl FromRequestParts<AppState> for OrgAccess {
             .extensions
             .get::<axum::extract::Path<std::collections::HashMap<String, String>>>()
             .and_then(|p| p.get("slug").cloned())
+            .or_else(|| {
+                parts
+                    .extensions
+                    .get::<OriginalUri>()
+                    .and_then(|uri| extract_slug_from_path(uri.0.path()))
+            })
             .or_else(|| {
                 // Try extracting from URI path
                 extract_slug_from_path(parts.uri.path())

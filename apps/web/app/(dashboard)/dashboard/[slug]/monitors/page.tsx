@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -16,11 +16,9 @@ export default function MonitorsPage() {
   const [monitors, setMonitors] = useState<Monitor[]>([]);
   const [loading, setLoading] = useState(true);
 
-  async function fetchMonitors() {
+  const fetchMonitors = useCallback(async () => {
     try {
-      const res = await fetch(
-        `/api/proxy/api/organizations/${slug}/monitors`,
-      );
+      const res = await fetch(`/api/proxy/api/organizations/${slug}/monitors`);
       if (res.ok) {
         const body = await res.json();
         setMonitors(body.data);
@@ -30,11 +28,11 @@ export default function MonitorsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [slug]);
 
   useEffect(() => {
     fetchMonitors();
-  }, [slug]);
+  }, [fetchMonitors]);
 
   async function handleDelete(monitorId: string) {
     if (!confirm("Are you sure?")) return;

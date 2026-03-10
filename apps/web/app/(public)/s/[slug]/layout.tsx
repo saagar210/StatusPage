@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function PublicStatusLayout({
   children,
 }: {
@@ -8,9 +10,9 @@ export default function PublicStatusLayout({
       {children}
       <footer className="border-t py-6 text-center text-sm text-muted-foreground">
         Powered by{" "}
-        <a href="/" className="underline hover:text-foreground">
+        <Link href="/" className="underline hover:text-foreground">
           StatusPage.sh
-        </a>
+        </Link>
       </footer>
     </div>
   );

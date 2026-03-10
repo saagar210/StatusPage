@@ -13,6 +13,7 @@ use crate::checker;
 use crate::config::Config;
 use crate::db;
 use crate::evaluator;
+use crate::redis_publisher::RedisPublisher;
 use crate::rollup;
 
 struct MonitorTask {
@@ -24,11 +25,16 @@ struct MonitorTask {
 pub struct Scheduler {
     pool: PgPool,
     config: Config,
+    publisher: Option<RedisPublisher>,
 }
 
 impl Scheduler {
-    pub fn new(pool: PgPool, config: Config) -> Self {
-        Self { pool, config }
+    pub fn new(pool: PgPool, config: Config, publisher: Option<RedisPublisher>) -> Self {
+        Self {
+            pool,
+            config,
+            publisher,
+        }
     }
 
     pub async fn run(&self) -> anyhow::Result<()> {
@@ -140,10 +146,11 @@ impl Scheduler {
             let pool = self.pool.clone();
             let sem = semaphore.clone();
             let cancel_clone = cancel.clone();
+            let publisher = self.publisher.clone();
 
             let monitor_id = monitor.id;
             let handle = tokio::spawn(async move {
-                run_monitor_loop(pool, monitor, sem, cancel_clone).await;
+                run_monitor_loop(pool, monitor, sem, cancel_clone, publisher).await;
             });
 
             tasks.insert(
@@ -163,6 +170,7 @@ async fn run_monitor_loop(
     monitor: Monitor,
     semaphore: Arc<Semaphore>,
     cancel: CancellationToken,
+    publisher: Option<RedisPublisher>,
 ) {
     let config: MonitorConfig = match serde_json::from_value(monitor.config.clone()) {
         Ok(c) => c,
@@ -228,7 +236,9 @@ async fn run_monitor_loop(
                     }
                 };
 
-                if let Err(e) = evaluator::evaluate(&pool, &current_monitor, &result).await {
+                if let Err(e) =
+                    evaluator::evaluate(&pool, &current_monitor, &result, publisher.as_ref()).await
+                {
                     tracing::error!(
                         monitor_id = %monitor.id,
                         error = %e,

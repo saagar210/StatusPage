@@ -1,12 +1,21 @@
-import { chromium, FullConfig } from "@playwright/test";
 import { execSync } from "child_process";
 
-/**
- * Global setup runs once before all tests.
- * Sets up database and creates test data.
- */
-async function globalSetup(config: FullConfig) {
+async function globalSetup() {
   console.log("🔧 Running E2E global setup...");
+
+  const needsBackendBootstrap =
+    process.env.E2E_WITH_BACKEND === "true" ||
+    Boolean(process.env.TEST_SESSION_TOKEN);
+
+  if (!needsBackendBootstrap) {
+    console.log("ℹ️  Skipping backend bootstrap for public-only Playwright run");
+    return;
+  }
+
+  if (process.env.TEST_SESSION_TOKEN) {
+    console.log("ℹ️  Using pre-provisioned backend and deterministic test session");
+    return;
+  }
 
   // Check if API is running
   const apiUrl = process.env.API_URL || "http://localhost:4000";
@@ -49,17 +58,9 @@ async function globalSetup(config: FullConfig) {
     throw error;
   }
 
-  // Create authenticated session for testing
-  console.log("Creating test session...");
-  const browser = await chromium.launch();
-  const context = await browser.newContext();
-  const page = await context.newPage();
-
-  // TODO: In a real setup, we'd create a test user session here
-  // For now, we'll rely on seeded data and manual auth setup
-  console.log("⚠️  Note: Authenticated tests require manual session setup");
-
-  await browser.close();
+  console.log(
+    "⚠️  This path only prepares backend data. Use `pnpm e2e:auth` for authenticated browser runs.",
+  );
 
   console.log("✅ Global setup complete!");
 }

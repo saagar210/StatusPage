@@ -1,12 +1,41 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+import { Activity, Bell, Globe, Server } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Activity, Bell, Globe, Server } from "lucide-react";
+import { resolveCustomDomainFromHeaders } from "@/lib/custom-domain";
+import { PublicStatusPageContent } from "@/components/status/public-status-page";
 
-export default function LandingPage() {
+export async function generateMetadata(): Promise<Metadata> {
+  const resolvedCustomDomain = await resolveCustomDomainFromHeaders();
+
+  if (resolvedCustomDomain) {
+    return {
+      title: `${resolvedCustomDomain.organization.name} Status`,
+      description: `Current status and uptime for ${resolvedCustomDomain.organization.name}`,
+    };
+  }
+
+  return {
+    title: "StatusPage.sh",
+    description: "Open-source status pages that just work",
+  };
+}
+
+export default async function LandingPage() {
+  const resolvedCustomDomain = await resolveCustomDomainFromHeaders();
+
+  if (resolvedCustomDomain) {
+    return (
+      <PublicStatusPageContent
+        slug={resolvedCustomDomain.slug}
+        resolvedCustomDomain={resolvedCustomDomain}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col items-center">
-      {/* Hero */}
       <section className="w-full py-24 md:py-32">
         <div className="container mx-auto px-4 text-center">
           <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
@@ -35,7 +64,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features */}
       <section className="w-full border-t py-24">
         <div className="container mx-auto px-4">
           <h2 className="text-center text-3xl font-bold">
@@ -44,7 +72,7 @@ export default function LandingPage() {
           <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader>
-                <Activity className="h-8 w-8 mb-2 text-primary" />
+                <Activity className="mb-2 h-8 w-8 text-primary" />
                 <CardTitle>Uptime Monitoring</CardTitle>
                 <CardDescription>
                   HTTP, TCP, DNS, and ICMP checks at configurable intervals.
@@ -54,7 +82,7 @@ export default function LandingPage() {
             </Card>
             <Card>
               <CardHeader>
-                <Bell className="h-8 w-8 mb-2 text-primary" />
+                <Bell className="mb-2 h-8 w-8 text-primary" />
                 <CardTitle>Incident Management</CardTitle>
                 <CardDescription>
                   Create and manage incidents with timeline updates. Keep your
@@ -64,7 +92,7 @@ export default function LandingPage() {
             </Card>
             <Card>
               <CardHeader>
-                <Globe className="h-8 w-8 mb-2 text-primary" />
+                <Globe className="mb-2 h-8 w-8 text-primary" />
                 <CardTitle>Public Status Page</CardTitle>
                 <CardDescription>
                   Beautiful, branded status pages with 90-day uptime history.
@@ -74,7 +102,7 @@ export default function LandingPage() {
             </Card>
             <Card>
               <CardHeader>
-                <Server className="h-8 w-8 mb-2 text-primary" />
+                <Server className="mb-2 h-8 w-8 text-primary" />
                 <CardTitle>Self-Hostable</CardTitle>
                 <CardDescription>
                   MIT licensed. Deploy with Docker Compose in minutes. Your

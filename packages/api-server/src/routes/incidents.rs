@@ -21,12 +21,12 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/", post(create_incident).get(list_incidents))
         .route(
-            "/:id",
+            "/{id}",
             get(get_incident)
                 .patch(update_incident)
                 .delete(delete_incident),
         )
-        .route("/:id/updates", post(create_update))
+        .route("/{id}/updates", post(create_update))
 }
 
 #[derive(Serialize)]
@@ -81,8 +81,55 @@ async fn create_incident(
         timestamp: chrono::Utc::now(),
     };
 
-    if let Err(e) = state.publisher.publish_incident_created(org_access.org.id, event).await {
+    if let Err(e) = state
+        .publisher
+        .publish_incident_created(org_access.org.id, event)
+        .await
+    {
         tracing::warn!("Failed to publish incident created event: {}", e);
+    }
+
+    let payload = serde_json::json!({
+        "event_type": "incident.created",
+        "org_id": org_access.org.id,
+        "occurred_at": chrono::Utc::now(),
+        "data": {
+            "incident_id": incident.id,
+            "title": incident.title.clone(),
+            "status": incident.status,
+            "impact": incident.impact.as_str(),
+            "affected_services": req.affected_service_ids.clone(),
+        }
+    });
+    if let Err(error) = db::webhook_deliveries::enqueue_for_event(
+        &state.pool,
+        org_access.org.id,
+        "incident.created",
+        &payload,
+    )
+    .await
+    {
+        tracing::warn!(
+            error = %error,
+            "Failed to queue incident created webhook deliveries"
+        );
+    }
+
+    if let Err(error) = crate::services::email_notifications::queue_incident_created(
+        &state.pool,
+        org_access.org.id,
+        &state.config.app_base_url,
+        &org_access.org.slug,
+        &incident.title,
+        incident.impact,
+        &req.affected_service_ids,
+    )
+    .await
+    {
+        tracing::warn!(
+            error = %error,
+            "Failed to queue incident created subscriber emails"
+        );
     }
 
     Ok((
@@ -247,8 +294,60 @@ async fn create_update(
         timestamp: chrono::Utc::now(),
     };
 
-    if let Err(e) = state.publisher.publish_incident_updated(org_access.org.id, event).await {
+    if let Err(e) = state
+        .publisher
+        .publish_incident_updated(org_access.org.id, event)
+        .await
+    {
         tracing::warn!("Failed to publish incident updated event: {}", e);
+    }
+
+    let webhook_event_type = if req.status == IncidentStatus::Resolved {
+        "incident.resolved"
+    } else {
+        "incident.updated"
+    };
+    let payload = serde_json::json!({
+        "event_type": webhook_event_type,
+        "org_id": org_access.org.id,
+        "occurred_at": chrono::Utc::now(),
+        "data": {
+            "incident_id": id,
+            "update_id": update.id,
+            "status": req.status,
+            "message": req.message.clone(),
+        }
+    });
+    if let Err(error) = db::webhook_deliveries::enqueue_for_event(
+        &state.pool,
+        org_access.org.id,
+        webhook_event_type,
+        &payload,
+    )
+    .await
+    {
+        tracing::warn!(
+            error = %error,
+            event_type = webhook_event_type,
+            "Failed to queue incident webhook deliveries"
+        );
+    }
+
+    if let Err(error) = crate::services::email_notifications::queue_incident_updated(
+        &state.pool,
+        org_access.org.id,
+        &state.config.app_base_url,
+        &org_access.org.slug,
+        req.status,
+        &req.message,
+    )
+    .await
+    {
+        tracing::warn!(
+            error = %error,
+            event_type = webhook_event_type,
+            "Failed to queue incident update subscriber emails"
+        );
     }
 
     Ok((
