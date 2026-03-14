@@ -26,15 +26,27 @@ pub async fn create(
 
     let monitor = sqlx::query_as::<_, Monitor>(
         r#"
-        INSERT INTO monitors (service_id, org_id, monitor_type, config, interval_seconds, timeout_ms, failure_threshold)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO monitors (
+            service_id,
+            org_id,
+            monitor_type,
+            config,
+            interval_seconds,
+            timeout_ms,
+            failure_threshold,
+            disabled_reason
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)
         RETURNING *
         "#,
     )
     .bind(req.service_id)
     .bind(org_id)
     .bind(req.monitor_type)
-    .bind(normalize_monitor_config(req.monitor_type, req.config.clone()))
+    .bind(normalize_monitor_config(
+        req.monitor_type,
+        req.config.clone(),
+    ))
     .bind(req.interval_seconds.unwrap_or(60))
     .bind(req.timeout_ms.unwrap_or(10000))
     .bind(req.failure_threshold.unwrap_or(3))
@@ -56,11 +68,12 @@ pub async fn find_by_org(pool: &PgPool, org_id: Uuid) -> Result<Vec<Monitor>, Ap
 }
 
 pub async fn count_by_org(pool: &PgPool, org_id: Uuid) -> Result<i64, AppError> {
-    let total: i64 =
-        sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM monitors WHERE org_id = $1")
-            .bind(org_id)
-            .fetch_one(pool)
-            .await?;
+    let total: i64 = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM monitors WHERE org_id = $1 AND disabled_reason IS NULL",
+    )
+    .bind(org_id)
+    .fetch_one(pool)
+    .await?;
 
     Ok(total)
 }
@@ -98,6 +111,10 @@ pub async fn update(
             timeout_ms = COALESCE($5, timeout_ms),
             failure_threshold = COALESCE($6, failure_threshold),
             is_active = COALESCE($7, is_active),
+            disabled_reason = CASE
+                WHEN COALESCE($7, is_active) THEN NULL
+                ELSE disabled_reason
+            END,
             updated_at = NOW()
         WHERE id = $1 AND org_id = $2
         RETURNING *
@@ -166,4 +183,55 @@ pub async fn get_check_history(
     .await?;
 
     Ok((checks, total))
+}
+
+pub async fn restore_plan_limited(pool: &PgPool, org_id: Uuid) -> Result<(), AppError> {
+    sqlx::query(
+        r#"
+        UPDATE monitors
+        SET disabled_reason = NULL, is_active = TRUE, updated_at = NOW()
+        WHERE org_id = $1 AND disabled_reason = 'plan_limit'
+        "#,
+    )
+    .bind(org_id)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn disable_excess_for_plan(
+    pool: &PgPool,
+    org_id: Uuid,
+    keep_count: i64,
+) -> Result<Vec<Uuid>, AppError> {
+    let disabled_ids = sqlx::query_scalar::<_, Uuid>(
+        r#"
+        WITH ranked AS (
+            SELECT id,
+                   ROW_NUMBER() OVER (ORDER BY created_at ASC, id ASC) AS position
+            FROM monitors
+            WHERE org_id = $1
+              AND disabled_reason IS NULL
+        ),
+        to_disable AS (
+            SELECT id
+            FROM ranked
+            WHERE position > $2
+        )
+        UPDATE monitors
+        SET
+            is_active = FALSE,
+            disabled_reason = 'plan_limit',
+            updated_at = NOW()
+        WHERE id IN (SELECT id FROM to_disable)
+        RETURNING id
+        "#,
+    )
+    .bind(org_id)
+    .bind(keep_count)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(disabled_ids)
 }

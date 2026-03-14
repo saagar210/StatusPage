@@ -16,6 +16,7 @@ use tracing_subscriber::EnvFilter;
 use crate::config::Config;
 use crate::middleware::request_id::RequestIdLayer;
 use crate::routes::api_router;
+use crate::services::downgrade;
 use crate::services::email_dispatcher;
 use crate::services::webhook_dispatcher;
 use crate::state::AppState;
@@ -91,6 +92,7 @@ async fn main() -> anyhow::Result<()> {
 
     webhook_dispatcher::spawn(state.pool.clone(), config.clone());
     email_dispatcher::spawn(state.pool.clone(), config.clone());
+    downgrade::spawn(state.pool.clone(), config.clone());
 
     let app = api_router(state)
         .layer(TraceLayer::new_for_http())

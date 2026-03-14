@@ -7,6 +7,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
+use shared::enums::OrganizationPlan;
 use shared::error::AppError;
 use shared::models::notification_preference::{
     NotificationPreferences, UpdateNotificationPreferencesRequest,
@@ -337,9 +338,28 @@ async fn create_webhook(
     Json(req): Json<CreateWebhookConfigRequest>,
 ) -> Result<(axum::http::StatusCode, Json<DataResponse<WebhookConfig>>), AppError> {
     org_access.require_admin()?;
+    require_webhook_feature(org_access.org.plan)?;
     validate_webhook_payload(&req.name, &req.url, &req.secret, &req.event_types)?;
 
     let webhook = db::webhooks::create(&state.pool, org_access.org.id, &req).await?;
+    db::audit_logs::record(
+        &state.pool,
+        db::audit_logs::NewAuditLog {
+            org_id: org_access.org.id,
+            actor_user_id: Some(org_access.user.id),
+            actor_type: "user",
+            action: "webhook.create",
+            target_type: "webhook",
+            target_id: Some(&webhook.id.to_string()),
+            details: serde_json::json!({
+                "name": webhook.name.clone(),
+                "url": webhook.url.clone(),
+                "event_types": webhook.event_types.clone(),
+                "is_enabled": webhook.is_enabled,
+            }),
+        },
+    )
+    .await?;
     Ok((
         axum::http::StatusCode::CREATED,
         Json(DataResponse { data: webhook }),
@@ -353,6 +373,7 @@ async fn update_webhook(
     Json(req): Json<UpdateWebhookConfigRequest>,
 ) -> Result<Json<DataResponse<WebhookConfig>>, AppError> {
     org_access.require_admin()?;
+    require_webhook_update_access(org_access.org.plan, &req)?;
 
     if let Some(name) = req.name.as_deref() {
         if name.trim().is_empty() {
@@ -377,6 +398,24 @@ async fn update_webhook(
     }
 
     let webhook = db::webhooks::update(&state.pool, id, org_access.org.id, &req).await?;
+    db::audit_logs::record(
+        &state.pool,
+        db::audit_logs::NewAuditLog {
+            org_id: org_access.org.id,
+            actor_user_id: Some(org_access.user.id),
+            actor_type: "user",
+            action: "webhook.update",
+            target_type: "webhook",
+            target_id: Some(&webhook.id.to_string()),
+            details: serde_json::json!({
+                "name": webhook.name.clone(),
+                "url": webhook.url.clone(),
+                "event_types": webhook.event_types.clone(),
+                "is_enabled": webhook.is_enabled,
+            }),
+        },
+    )
+    .await?;
     Ok(Json(DataResponse { data: webhook }))
 }
 
@@ -388,6 +427,19 @@ async fn delete_webhook(
     org_access.require_admin()?;
 
     db::webhooks::delete(&state.pool, id, org_access.org.id).await?;
+    db::audit_logs::record(
+        &state.pool,
+        db::audit_logs::NewAuditLog {
+            org_id: org_access.org.id,
+            actor_user_id: Some(org_access.user.id),
+            actor_type: "user",
+            action: "webhook.delete",
+            target_type: "webhook",
+            target_id: Some(&id.to_string()),
+            details: serde_json::json!({}),
+        },
+    )
+    .await?;
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
@@ -441,9 +493,45 @@ fn validate_webhook_event_types(event_types: &[String]) -> Result<(), AppError> 
     Ok(())
 }
 
+fn require_webhook_feature(plan: OrganizationPlan) -> Result<(), AppError> {
+    if !plan.allows_outbound_webhooks() {
+        return Err(AppError::Validation(
+            "Outbound webhooks are available on Pro and Team plans. Upgrade to add one."
+                .to_string(),
+        ));
+    }
+
+    Ok(())
+}
+
+fn require_webhook_update_access(
+    plan: OrganizationPlan,
+    req: &UpdateWebhookConfigRequest,
+) -> Result<(), AppError> {
+    if plan.allows_outbound_webhooks() {
+        return Ok(());
+    }
+
+    let disabling_only = req.name.is_none()
+        && req.url.is_none()
+        && req.secret.is_none()
+        && req.event_types.is_none()
+        && req.is_enabled == Some(false);
+
+    if disabling_only {
+        Ok(())
+    } else {
+        Err(AppError::Validation(
+            "Outbound webhooks are available on Pro and Team plans. Upgrade to manage them."
+                .to_string(),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use shared::models::webhook::UpdateWebhookConfigRequest;
 
     #[test]
     fn rejects_unknown_webhook_event_types() {
@@ -458,5 +546,41 @@ mod tests {
             "service.status_changed".to_string(),
         ]);
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn free_plan_cannot_create_webhooks() {
+        let result = require_webhook_feature(OrganizationPlan::Free);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn free_plan_can_disable_existing_webhook() {
+        let result = require_webhook_update_access(
+            OrganizationPlan::Free,
+            &UpdateWebhookConfigRequest {
+                name: None,
+                url: None,
+                secret: None,
+                event_types: None,
+                is_enabled: Some(false),
+            },
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn free_plan_cannot_enable_existing_webhook() {
+        let result = require_webhook_update_access(
+            OrganizationPlan::Free,
+            &UpdateWebhookConfigRequest {
+                name: None,
+                url: None,
+                secret: None,
+                event_types: None,
+                is_enabled: Some(true),
+            },
+        );
+        assert!(result.is_err());
     }
 }

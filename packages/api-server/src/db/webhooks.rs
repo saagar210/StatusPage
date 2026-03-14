@@ -9,6 +9,7 @@ pub async fn find_by_org(pool: &PgPool, org_id: Uuid) -> Result<Vec<WebhookConfi
     let webhooks = sqlx::query_as::<_, WebhookConfig>(
         r#"
         SELECT id, org_id, name, url, event_types, is_enabled, created_at, updated_at
+             , disabled_reason
         FROM webhook_configs
         WHERE org_id = $1
         ORDER BY created_at DESC
@@ -28,9 +29,9 @@ pub async fn create(
 ) -> Result<WebhookConfig, AppError> {
     let webhook = sqlx::query_as::<_, WebhookConfig>(
         r#"
-        INSERT INTO webhook_configs (org_id, name, url, secret, event_types, is_enabled)
-        VALUES ($1, $2, $3, $4, $5, COALESCE($6, true))
-        RETURNING id, org_id, name, url, event_types, is_enabled, created_at, updated_at
+        INSERT INTO webhook_configs (org_id, name, url, secret, event_types, is_enabled, disabled_reason)
+        VALUES ($1, $2, $3, $4, $5, COALESCE($6, true), NULL)
+        RETURNING id, org_id, name, url, event_types, is_enabled, disabled_reason, created_at, updated_at
         "#,
     )
     .bind(org_id)
@@ -59,9 +60,13 @@ pub async fn update(
             secret = COALESCE($5, secret),
             event_types = COALESCE($6, event_types),
             is_enabled = COALESCE($7, is_enabled),
+            disabled_reason = CASE
+                WHEN COALESCE($7, is_enabled) THEN NULL
+                ELSE disabled_reason
+            END,
             updated_at = NOW()
         WHERE id = $1 AND org_id = $2
-        RETURNING id, org_id, name, url, event_types, is_enabled, created_at, updated_at
+        RETURNING id, org_id, name, url, event_types, is_enabled, disabled_reason, created_at, updated_at
         "#,
     )
     .bind(id)
@@ -88,6 +93,36 @@ pub async fn delete(pool: &PgPool, id: Uuid, org_id: Uuid) -> Result<(), AppErro
     if result.rows_affected() == 0 {
         return Err(AppError::NotFound("Webhook not found".to_string()));
     }
+
+    Ok(())
+}
+
+pub async fn disable_all_for_org(pool: &PgPool, org_id: Uuid) -> Result<(), AppError> {
+    sqlx::query(
+        r#"
+        UPDATE webhook_configs
+        SET is_enabled = FALSE, disabled_reason = 'plan_limit', updated_at = NOW()
+        WHERE org_id = $1 AND is_enabled = TRUE
+        "#,
+    )
+    .bind(org_id)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn restore_plan_limited(pool: &PgPool, org_id: Uuid) -> Result<(), AppError> {
+    sqlx::query(
+        r#"
+        UPDATE webhook_configs
+        SET is_enabled = TRUE, disabled_reason = NULL, updated_at = NOW()
+        WHERE org_id = $1 AND disabled_reason = 'plan_limit'
+        "#,
+    )
+    .bind(org_id)
+    .execute(pool)
+    .await?;
 
     Ok(())
 }

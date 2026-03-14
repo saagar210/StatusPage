@@ -1,5 +1,6 @@
 pub mod incident;
 pub mod incident_update;
+pub mod invitation;
 pub mod member;
 pub mod monitor;
 pub mod notification_preference;

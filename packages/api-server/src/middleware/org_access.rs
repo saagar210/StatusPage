@@ -1,7 +1,7 @@
 use axum::extract::FromRequestParts;
 use axum::extract::OriginalUri;
 use axum::http::request::Parts;
-use shared::enums::{MemberRole, OrganizationPlan};
+use shared::enums::{CustomDomainStatus, DowngradeState, MemberRole, OrganizationPlan};
 use shared::error::AppError;
 use shared::models::organization::Organization;
 
@@ -67,7 +67,12 @@ impl FromRequestParts<AppState> for OrgAccess {
         let row = sqlx::query_as::<_, OrgMemberRow>(
             r#"
             SELECT o.id, o.name, o.slug, o.plan, o.logo_url, o.brand_color,
-                   o.timezone, o.custom_domain, o.stripe_customer_id,
+                   o.timezone, o.custom_domain, o.custom_domain_verified_at, o.custom_domain_status, o.stripe_customer_id,
+                   o.stripe_subscription_id, o.subscription_status,
+                   o.stripe_price_id, o.current_period_end,
+                   o.cancel_at_period_end, o.billing_email, o.trial_ends_at,
+                   o.downgrade_target_plan, o.downgrade_started_at, o.downgrade_grace_ends_at,
+                   o.downgrade_state, o.downgrade_warning_stage,
                    o.created_at, o.updated_at, m.role
             FROM organizations o
             JOIN members m ON m.org_id = o.id
@@ -95,7 +100,21 @@ impl FromRequestParts<AppState> for OrgAccess {
                 brand_color: row.brand_color,
                 timezone: row.timezone,
                 custom_domain: row.custom_domain,
+                custom_domain_verified_at: row.custom_domain_verified_at,
+                custom_domain_status: row.custom_domain_status,
                 stripe_customer_id: row.stripe_customer_id,
+                stripe_subscription_id: row.stripe_subscription_id,
+                subscription_status: row.subscription_status,
+                stripe_price_id: row.stripe_price_id,
+                current_period_end: row.current_period_end,
+                cancel_at_period_end: row.cancel_at_period_end,
+                billing_email: row.billing_email,
+                trial_ends_at: row.trial_ends_at,
+                downgrade_target_plan: row.downgrade_target_plan,
+                downgrade_started_at: row.downgrade_started_at,
+                downgrade_grace_ends_at: row.downgrade_grace_ends_at,
+                downgrade_state: row.downgrade_state,
+                downgrade_warning_stage: row.downgrade_warning_stage,
                 created_at: row.created_at,
                 updated_at: row.updated_at,
             },
@@ -115,7 +134,21 @@ struct OrgMemberRow {
     brand_color: String,
     timezone: String,
     custom_domain: Option<String>,
+    custom_domain_verified_at: Option<chrono::DateTime<chrono::Utc>>,
+    custom_domain_status: CustomDomainStatus,
     stripe_customer_id: Option<String>,
+    stripe_subscription_id: Option<String>,
+    subscription_status: shared::enums::SubscriptionStatus,
+    stripe_price_id: Option<String>,
+    current_period_end: Option<chrono::DateTime<chrono::Utc>>,
+    cancel_at_period_end: bool,
+    billing_email: Option<String>,
+    trial_ends_at: Option<chrono::DateTime<chrono::Utc>>,
+    downgrade_target_plan: Option<OrganizationPlan>,
+    downgrade_started_at: Option<chrono::DateTime<chrono::Utc>>,
+    downgrade_grace_ends_at: Option<chrono::DateTime<chrono::Utc>>,
+    downgrade_state: DowngradeState,
+    downgrade_warning_stage: i32,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
     role: MemberRole,

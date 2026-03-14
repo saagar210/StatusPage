@@ -1,5 +1,6 @@
 use axum::{
     extract::{Path, Query, State},
+    http::HeaderMap,
     routing::{get, post},
     Json, Router,
 };
@@ -94,7 +95,7 @@ async fn resolve_custom_domain(
         .ok_or_else(|| AppError::Validation("Host is required".to_string()))?;
 
     let org = sqlx::query_as::<_, OrgRow>(
-        "SELECT id, slug, name, logo_url, brand_color FROM organizations WHERE lower(custom_domain) = $1",
+        "SELECT id, slug, name, logo_url, brand_color FROM organizations WHERE lower(custom_domain) = $1 AND custom_domain_status = 'verified'",
     )
     .bind(&host)
     .fetch_optional(&state.pool)
@@ -198,6 +199,7 @@ async fn get_status(
 
 async fn subscribe(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(slug): Path<String>,
     Json(req): Json<SubscribeRequest>,
 ) -> Result<
@@ -208,6 +210,19 @@ async fn subscribe(
     AppError,
 > {
     let email = req.email.trim().to_lowercase();
+    let subject = format!(
+        "{}:{}",
+        crate::services::rate_limit::rate_limit_subject(&headers, "local"),
+        email
+    );
+    crate::services::rate_limit::enforce_rate_limit(
+        &state.redis,
+        "public_subscribe",
+        &subject,
+        5,
+        std::time::Duration::from_secs(15 * 60),
+    )
+    .await?;
     if !looks_like_email(&email) {
         return Err(AppError::Validation(
             "Enter a valid email address".to_string(),
@@ -270,9 +285,18 @@ struct TokenParams {
 
 async fn verify_subscriber(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(slug): Path<String>,
     Query(params): Query<TokenParams>,
 ) -> Result<Json<DataResponse<PublicMessageResponse>>, AppError> {
+    crate::services::rate_limit::enforce_rate_limit(
+        &state.redis,
+        "subscriber_verify",
+        &crate::services::rate_limit::rate_limit_subject(&headers, "local"),
+        20,
+        std::time::Duration::from_secs(15 * 60),
+    )
+    .await?;
     let org_id =
         sqlx::query_scalar::<_, uuid::Uuid>("SELECT id FROM organizations WHERE slug = $1")
             .bind(&slug)
@@ -295,9 +319,18 @@ async fn verify_subscriber(
 
 async fn unsubscribe_subscriber(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Path(slug): Path<String>,
     Query(params): Query<TokenParams>,
 ) -> Result<Json<DataResponse<PublicMessageResponse>>, AppError> {
+    crate::services::rate_limit::enforce_rate_limit(
+        &state.redis,
+        "subscriber_unsubscribe",
+        &crate::services::rate_limit::rate_limit_subject(&headers, "local"),
+        20,
+        std::time::Duration::from_secs(15 * 60),
+    )
+    .await?;
     let org_id =
         sqlx::query_scalar::<_, uuid::Uuid>("SELECT id FROM organizations WHERE slug = $1")
             .bind(&slug)

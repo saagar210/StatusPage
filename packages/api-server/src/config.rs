@@ -20,9 +20,12 @@ pub struct Config {
     pub stripe_webhook_secret: Option<String>,
     pub stripe_price_pro: Option<String>,
     pub stripe_price_team: Option<String>,
+    pub internal_admin_token: Option<String>,
+    pub downgrade_enforcement_interval_secs: u64,
     pub api_port: u16,
     pub api_host: String,
     pub cors_origin: String,
+    pub statuspage_host: Option<String>,
     pub run_migrations_on_start: bool,
     pub run_migrations_only: bool,
     pub log_level: String,
@@ -87,6 +90,15 @@ impl Config {
             stripe_price_team: std::env::var("STRIPE_PRICE_TEAM")
                 .ok()
                 .filter(|value| !value.trim().is_empty()),
+            internal_admin_token: std::env::var("INTERNAL_ADMIN_TOKEN")
+                .ok()
+                .filter(|value| !value.trim().is_empty()),
+            downgrade_enforcement_interval_secs: std::env::var(
+                "DOWNGRADE_ENFORCEMENT_INTERVAL_SECS",
+            )
+            .unwrap_or_else(|_| "60".to_string())
+            .parse()
+            .context("DOWNGRADE_ENFORCEMENT_INTERVAL_SECS must be a number")?,
             api_port: std::env::var("API_PORT")
                 .unwrap_or_else(|_| "4000".to_string())
                 .parse()
@@ -94,6 +106,9 @@ impl Config {
             api_host: std::env::var("API_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()),
             cors_origin: std::env::var("CORS_ORIGIN")
                 .unwrap_or_else(|_| "http://localhost:3000".to_string()),
+            statuspage_host: std::env::var("STATUSPAGE_HOST")
+                .ok()
+                .filter(|value| !value.trim().is_empty()),
             run_migrations_on_start: std::env::var("RUN_MIGRATIONS_ON_START")
                 .unwrap_or_else(|_| "true".to_string())
                 .parse()
