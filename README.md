@@ -1,6 +1,8 @@
 # StatusPage.sh
 
-Open-source status page platform with automated monitoring. The core self-hosted product is now broadly implemented, while operator hardening and the commercial feature set are still being finished.
+Open-source status page platform with automated monitoring. The current repo is
+focused on a launchable self-hosted core; operator hardening is still underway,
+and commercial billing or hosted-plan workflows are not shipped yet.
 
 [![CI](https://github.com/saagar210/StatusPage/actions/workflows/ci.yml/badge.svg)](https://github.com/saagar210/StatusPage/actions/workflows/ci.yml)
 
@@ -70,6 +72,13 @@ cp .env.example .env
 #   - AUTH_GITHUB_ID and AUTH_GITHUB_SECRET
 ```
 
+The default local `.env.example` uses high-numbered ports (`55432` for PostgreSQL,
+`56379` for Redis) to avoid colliding with services you may already have running
+on the usual local defaults.
+Leave `AUTH_GITHUB_ID` and `AUTH_GITHUB_SECRET` blank until you have a real GitHub
+OAuth app; the local helper scripts source `.env`, so placeholder values must stay
+shell-safe.
+
 3. **Start PostgreSQL and Redis**
 
 ```bash
@@ -104,7 +113,7 @@ pnpm run dev:api
 pnpm run dev:web
 
 # Terminal 3: Monitor engine (optional)
-cargo run -p monitor
+pnpm run dev:monitor
 ```
 
 ### Lean Dev Mode (low disk usage)
@@ -258,7 +267,7 @@ Supporting files:
 - [~] Webhooks (generic delivery, signing, retry, and dashboard retry actions are in place; provider-specific formatting and deeper drill-down are still pending)
 - [ ] Multi-region monitoring
 - [~] Custom domains for status pages are wired through dashboard settings, public routing, and email links; live DNS/TLS proof is still an operator task
-- [ ] Stripe billing integration
+- [ ] Stripe billing integration (not shipped in the current self-hosted build)
 - [~] Status page branding baseline exists in organization settings; advanced themes are still pending
 - [ ] SMS and provider-specific notification channels
 

@@ -1,5 +1,7 @@
 use shared::error::AppError;
-use shared::models::monitor::{CreateMonitorRequest, Monitor, UpdateMonitorRequest};
+use shared::models::monitor::{
+    normalize_monitor_config, CreateMonitorRequest, Monitor, UpdateMonitorRequest,
+};
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -32,7 +34,7 @@ pub async fn create(
     .bind(req.service_id)
     .bind(org_id)
     .bind(req.monitor_type)
-    .bind(&req.config)
+    .bind(normalize_monitor_config(req.monitor_type, req.config.clone()))
     .bind(req.interval_seconds.unwrap_or(60))
     .bind(req.timeout_ms.unwrap_or(10000))
     .bind(req.failure_threshold.unwrap_or(3))
@@ -84,6 +86,10 @@ pub async fn update(
     org_id: Uuid,
     req: &UpdateMonitorRequest,
 ) -> Result<Monitor, AppError> {
+    let existing = find_by_id(pool, monitor_id, org_id)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Monitor not found".to_string()))?;
+
     let monitor = sqlx::query_as::<_, Monitor>(
         r#"
         UPDATE monitors SET
@@ -99,7 +105,11 @@ pub async fn update(
     )
     .bind(monitor_id)
     .bind(org_id)
-    .bind(&req.config)
+    .bind(
+        req.config
+            .clone()
+            .map(|config| normalize_monitor_config(existing.monitor_type, config)),
+    )
     .bind(req.interval_seconds)
     .bind(req.timeout_ms)
     .bind(req.failure_threshold)

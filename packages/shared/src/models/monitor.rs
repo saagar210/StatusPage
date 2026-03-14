@@ -127,3 +127,56 @@ pub struct ResponseTimePoint {
     pub avg_response_time_ms: Option<f64>,
     pub status: Option<CheckStatus>,
 }
+
+pub fn normalize_monitor_config(
+    monitor_type: MonitorType,
+    config: serde_json::Value,
+) -> serde_json::Value {
+    match config {
+        serde_json::Value::Object(mut map) => {
+            map.insert(
+                "type".to_string(),
+                serde_json::Value::String(monitor_type.as_str().to_string()),
+            );
+            serde_json::Value::Object(map)
+        }
+        other => other,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn normalize_monitor_config_adds_type_to_legacy_object() {
+        let normalized =
+            normalize_monitor_config(MonitorType::Http, json!({ "url": "https://example.com" }));
+
+        assert_eq!(
+            normalized,
+            json!({ "type": "http", "url": "https://example.com" })
+        );
+    }
+
+    #[test]
+    fn normalize_monitor_config_overrides_mismatched_type() {
+        let normalized = normalize_monitor_config(
+            MonitorType::Tcp,
+            json!({ "type": "http", "host": "db.example.com", "port": 5432 }),
+        );
+
+        assert_eq!(
+            normalized,
+            json!({ "type": "tcp", "host": "db.example.com", "port": 5432 })
+        );
+    }
+
+    #[test]
+    fn normalize_monitor_config_leaves_non_object_values_unchanged() {
+        let normalized = normalize_monitor_config(MonitorType::Dns, json!("bad-config"));
+
+        assert_eq!(normalized, json!("bad-config"));
+    }
+}

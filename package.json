@@ -4,7 +4,8 @@
   "scripts": {
     "dev": "turbo run dev",
     "dev:web": "turbo run dev --filter=web",
-    "dev:api": "cargo run -p api-server --bin api-server",
+    "dev:api": "bash scripts/with-dotenv.sh cargo run -p api-server --bin api-server",
+    "dev:monitor": "bash scripts/with-dotenv.sh cargo run -p monitor",
     "dev:lean": "bash scripts/dev-lean.sh",
     "setup:local": "bash scripts/setup-local-env.sh",
     "verify": "bash .codex/scripts/run_verify_commands.sh",
@@ -41,10 +42,10 @@
     "perf:summary": "node scripts/perf/summarize.mjs",
     "clean:heavy": "bash scripts/clean-local.sh heavy",
     "clean:full": "bash scripts/clean-local.sh full",
-    "db:up": "docker compose -f docker/docker-compose.dev.yml up -d",
-    "db:down": "docker compose -f docker/docker-compose.dev.yml down",
-    "db:migrate": "cargo run -p api-server --bin migrate",
-    "db:seed": "cargo run -p api-server --bin seed"
+    "db:up": "bash scripts/dev-db-up.sh",
+    "db:down": "docker compose --env-file .env -f docker/docker-compose.dev.yml down",
+    "db:migrate": "bash scripts/with-dotenv.sh cargo run -p api-server --bin migrate",
+    "db:seed": "bash scripts/with-dotenv.sh cargo run -p api-server --bin seed"
   },
   "devDependencies": {
     "turbo": "^2"

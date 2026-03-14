@@ -27,7 +27,8 @@ export default defineConfig({
     command:
       "AUTH_SECRET=playwright-secret AUTH_GITHUB_ID=playwright AUTH_GITHUB_SECRET=playwright pnpm dev",
     url: "http://localhost:3000",
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer:
+      !process.env.CI && process.env.E2E_WITH_BACKEND !== "true",
     timeout: 120 * 1000, // 2 minutes to start
   },
 });
