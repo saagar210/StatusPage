@@ -1,4 +1,7 @@
+pub mod admin;
+pub mod billing;
 pub mod incidents;
+pub mod invitations;
 pub mod monitors;
 pub mod notifications;
 pub mod organizations;
@@ -16,6 +19,9 @@ pub fn api_router(state: AppState) -> Router {
         .route("/health", get(health))
         .route("/ready", get(ready))
         .route("/ops/summary", get(ops_summary))
+        .nest("/api/admin", admin::router())
+        .nest("/api/billing", billing::router())
+        .nest("/api/invitations", invitations::router())
         .nest("/api/organizations", organizations::router())
         .nest("/api/organizations/{slug}/services", services::router())
         .nest("/api/organizations/{slug}/incidents", incidents::router())

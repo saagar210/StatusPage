@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from "next/server";
 const INTERNAL_API_URL =
   process.env.INTERNAL_API_URL || "http://localhost:4000";
 
-const ALLOWED_PREFIXES = ["/api/organizations", "/api/public"];
+const ALLOWED_PREFIXES = ["/api/admin", "/api/organizations", "/api/public"];
 
 async function proxyRequest(req: NextRequest) {
   const url = new URL(req.url);
@@ -28,6 +28,10 @@ async function proxyRequest(req: NextRequest) {
   };
   if (sessionToken) {
     headers["Cookie"] = `authjs.session-token=${sessionToken}`;
+  }
+  const adminToken = req.headers.get("x-statuspage-admin-token");
+  if (adminToken) {
+    headers["x-statuspage-admin-token"] = adminToken;
   }
 
   const targetUrl = `${INTERNAL_API_URL}${path}${url.search}`;

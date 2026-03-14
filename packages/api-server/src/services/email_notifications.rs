@@ -184,6 +184,35 @@ pub async fn queue_service_status_changed(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
+pub async fn queue_invitation_email(
+    pool: &sqlx::PgPool,
+    org_id: uuid::Uuid,
+    app_base_url: &str,
+    org_name: &str,
+    invitation_id: uuid::Uuid,
+    email: &str,
+    role: shared::enums::MemberRole,
+    token: &str,
+) -> Result<(), AppError> {
+    let invite_link = format!("{}/invite/{}", app_base_url.trim_end_matches('/'), token);
+    let subject = format!("Join {org_name} on StatusPage");
+    let body = format!(
+        "You were invited to join {org_name} as a {role}.\n\nAccept the invitation:\n{invite_link}\n\nSign in with the GitHub account that matches this email address."
+    );
+
+    db::notification_logs::enqueue(
+        pool,
+        org_id,
+        "invitation_email",
+        &format!("invitation:{invitation_id}"),
+        email,
+        &subject,
+        &body,
+    )
+    .await
+}
+
 async fn email_event_enabled(
     pool: &sqlx::PgPool,
     org_id: uuid::Uuid,
@@ -225,7 +254,7 @@ async fn public_urls(
     org_slug: &str,
 ) -> Result<PublicUrls, AppError> {
     let custom_domain = sqlx::query_scalar::<_, Option<String>>(
-        "SELECT custom_domain FROM organizations WHERE id = $1",
+        "SELECT custom_domain FROM organizations WHERE id = $1 AND custom_domain_status = 'verified'",
     )
     .bind(org_id)
     .fetch_optional(pool)

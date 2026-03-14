@@ -11,6 +11,7 @@ import {
   AlertTriangle,
   Globe,
   LayoutDashboard,
+  LifeBuoy,
   LogOut,
   Radio,
   Settings,
@@ -78,6 +79,13 @@ export function Sidebar({ slug, user }: SidebarProps) {
           >
             <Globe className="h-4 w-4" />
             View Status Page
+          </Link>
+          <Link
+            href="/dashboard/internal-support"
+            className="mt-1 flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+          >
+            <LifeBuoy className="h-4 w-4" />
+            Internal Support
           </Link>
         </div>
       </nav>

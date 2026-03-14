@@ -207,6 +207,18 @@ impl OrganizationPlan {
             Self::Team => None,
         }
     }
+
+    pub fn allows_custom_domain(&self) -> bool {
+        !matches!(self, Self::Free)
+    }
+
+    pub fn allows_outbound_webhooks(&self) -> bool {
+        !matches!(self, Self::Free)
+    }
+
+    pub fn has_priority_support(&self) -> bool {
+        matches!(self, Self::Team)
+    }
 }
 
 impl fmt::Display for OrganizationPlan {
@@ -217,6 +229,76 @@ impl fmt::Display for OrganizationPlan {
             Self::Team => write!(f, "team"),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum SubscriptionStatus {
+    Inactive,
+    CheckoutPending,
+    Trialing,
+    Active,
+    PastDue,
+    Canceled,
+    Unpaid,
+    Incomplete,
+    IncompleteExpired,
+}
+
+impl SubscriptionStatus {
+    pub fn from_stripe(status: &str) -> Self {
+        match status {
+            "trialing" => Self::Trialing,
+            "active" => Self::Active,
+            "past_due" => Self::PastDue,
+            "canceled" => Self::Canceled,
+            "unpaid" => Self::Unpaid,
+            "incomplete" => Self::Incomplete,
+            "incomplete_expired" => Self::IncompleteExpired,
+            "checkout_pending" => Self::CheckoutPending,
+            _ => Self::Inactive,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum DowngradeState {
+    None,
+    PendingCustomerAction,
+    ReadyToEnforce,
+    Enforced,
+    Canceled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum CustomDomainStatus {
+    NotConfigured,
+    PendingVerification,
+    Verified,
+    BlockedByPlan,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum DisabledReason {
+    PlanLimit,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
+#[sqlx(type_name = "VARCHAR", rename_all = "snake_case")]
+#[serde(rename_all = "snake_case")]
+pub enum InvitationDeliveryStatus {
+    Pending,
+    Accepted,
+    Expired,
+    Canceled,
+    DeliveryFailed,
 }
 
 impl fmt::Display for CheckStatus {
@@ -279,5 +361,31 @@ mod tests {
         assert_eq!(OrganizationPlan::Free.max_monitors(), Some(3));
         assert_eq!(OrganizationPlan::Pro.max_monitors(), Some(20));
         assert_eq!(OrganizationPlan::Team.max_monitors(), None);
+        assert!(!OrganizationPlan::Free.allows_custom_domain());
+        assert!(!OrganizationPlan::Free.allows_outbound_webhooks());
+        assert!(OrganizationPlan::Pro.allows_custom_domain());
+        assert!(OrganizationPlan::Team.has_priority_support());
+    }
+
+    #[test]
+    fn test_subscription_status_from_stripe() {
+        assert_eq!(
+            SubscriptionStatus::from_stripe("active"),
+            SubscriptionStatus::Active
+        );
+        assert_eq!(
+            SubscriptionStatus::from_stripe("incomplete_expired"),
+            SubscriptionStatus::IncompleteExpired
+        );
+        assert_eq!(
+            SubscriptionStatus::from_stripe("unexpected"),
+            SubscriptionStatus::Inactive
+        );
+    }
+
+    #[test]
+    fn invitation_delivery_status_serializes_in_snake_case() {
+        let json = serde_json::to_string(&InvitationDeliveryStatus::DeliveryFailed).unwrap();
+        assert_eq!(json, r#""delivery_failed""#);
     }
 }

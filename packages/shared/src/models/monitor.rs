@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-use crate::enums::{CheckStatus, MonitorType};
+use crate::enums::{CheckStatus, DisabledReason, MonitorType};
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Monitor {
@@ -16,6 +16,7 @@ pub struct Monitor {
     pub timeout_ms: i32,
     pub failure_threshold: i32,
     pub is_active: bool,
+    pub disabled_reason: Option<DisabledReason>,
     pub consecutive_failures: i32,
     pub last_checked_at: Option<DateTime<Utc>>,
     pub last_response_time_ms: Option<i32>,

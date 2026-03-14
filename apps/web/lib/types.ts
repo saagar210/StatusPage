@@ -23,6 +23,39 @@ export type CheckStatus = "success" | "failure" | "timeout";
 
 export type OrganizationPlan = "free" | "pro" | "team";
 
+export type SubscriptionStatus =
+  | "inactive"
+  | "checkout_pending"
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "unpaid"
+  | "incomplete"
+  | "incomplete_expired";
+
+export type DowngradeState =
+  | "none"
+  | "pending_customer_action"
+  | "ready_to_enforce"
+  | "enforced"
+  | "canceled";
+
+export type CustomDomainStatus =
+  | "not_configured"
+  | "pending_verification"
+  | "verified"
+  | "blocked_by_plan";
+
+export type DisabledReason = "plan_limit";
+
+export type InvitationDeliveryStatus =
+  | "pending"
+  | "accepted"
+  | "expired"
+  | "canceled"
+  | "delivery_failed";
+
 // --- Models ---
 
 export interface Organization {
@@ -34,7 +67,21 @@ export interface Organization {
   brand_color: string;
   timezone: string;
   custom_domain: string | null;
+  custom_domain_verified_at: string | null;
+  custom_domain_status: CustomDomainStatus;
   stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  subscription_status: SubscriptionStatus;
+  stripe_price_id: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
+  billing_email: string | null;
+  trial_ends_at: string | null;
+  downgrade_target_plan: OrganizationPlan | null;
+  downgrade_started_at: string | null;
+  downgrade_grace_ends_at: string | null;
+  downgrade_state: DowngradeState;
+  downgrade_warning_stage: number;
   created_at: string;
   updated_at: string;
 }
@@ -95,6 +142,7 @@ export interface Monitor {
   timeout_ms: number;
   failure_threshold: number;
   is_active: boolean;
+  disabled_reason: DisabledReason | null;
   consecutive_failures: number;
   last_checked_at: string | null;
   last_response_time_ms: number | null;
@@ -136,6 +184,7 @@ export interface WebhookConfig {
   url: string;
   event_types: string[];
   is_enabled: boolean;
+  disabled_reason: DisabledReason | null;
   created_at: string;
   updated_at: string;
 }
@@ -208,7 +257,30 @@ export interface MemberWithUser {
   user_image: string | null;
 }
 
+export interface Invitation {
+  id: string;
+  org_id: string;
+  email: string;
+  role: MemberRole;
+  invited_by: string;
+  token: string;
+  expires_at: string;
+  accepted_at: string | null;
+  canceled_at: string | null;
+  last_sent_at: string | null;
+  created_at: string;
+  updated_at: string;
+  inviter_name: string | null;
+  inviter_email: string;
+  delivery_status: InvitationDeliveryStatus;
+}
+
 export interface CreateMemberRequest {
+  email: string;
+  role: MemberRole;
+}
+
+export interface CreateInvitationRequest {
   email: string;
   role: MemberRole;
 }
@@ -222,8 +294,110 @@ export interface BillingSummary {
   portal_enabled: boolean;
   checkout_enabled: boolean;
   current_plan: OrganizationPlan;
+  subscription_status: SubscriptionStatus;
   stripe_customer_id: string | null;
+  billing_email: string | null;
+  current_period_end: string | null;
+  cancel_at_period_end: boolean;
   available_upgrades: OrganizationPlan[];
+  entitlements: BillingEntitlements;
+  downgrade_target_plan: OrganizationPlan | null;
+  downgrade_started_at: string | null;
+  downgrade_grace_ends_at: string | null;
+  downgrade_state: DowngradeState;
+  entitlement_violations: EntitlementViolation[];
+  required_actions: string[];
+  self_serve_downgrade: boolean;
+}
+
+export interface BillingEntitlements {
+  max_monitors: number | null;
+  custom_domain_enabled: boolean;
+  outbound_webhooks_enabled: boolean;
+  priority_support: boolean;
+}
+
+export interface EntitlementViolation {
+  code: string;
+  message: string;
+  current_count: number | null;
+  allowed_count: number | null;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  org_id: string;
+  actor_user_id: string | null;
+  actor_type: string;
+  action: string;
+  target_type: string;
+  target_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface BillingEventEntry {
+  stripe_event_id: string;
+  event_type: string;
+  processed_at: string;
+}
+
+export interface SupportQueueHealth {
+  pending_email_deliveries: number;
+  failed_email_deliveries: number;
+  pending_webhook_deliveries: number;
+  failed_webhook_deliveries: number;
+  recent_billing_events?: number;
+  pending_invitation_emails?: number;
+  pending_downgrade_warnings?: number;
+  organizations_in_grace?: number;
+}
+
+export interface SupportOrganizationSummary {
+  id: string;
+  name: string;
+  slug: string;
+  plan: OrganizationPlan;
+  subscription_status: SubscriptionStatus;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  billing_email: string | null;
+  custom_domain: string | null;
+  custom_domain_verified_at: string | null;
+  custom_domain_status: CustomDomainStatus;
+  downgrade_target_plan: OrganizationPlan | null;
+  downgrade_grace_ends_at: string | null;
+  downgrade_state: DowngradeState;
+  member_count: number;
+  pending_invitation_count: number;
+  subscriber_count: number;
+  webhook_count: number;
+}
+
+export interface SupportSearchResult {
+  id: string;
+  name: string;
+  slug: string;
+  plan: OrganizationPlan;
+  subscription_status: SubscriptionStatus;
+  billing_email: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  downgrade_state: DowngradeState;
+  downgrade_target_plan: OrganizationPlan | null;
+  downgrade_grace_ends_at: string | null;
+}
+
+export interface SupportOrganizationPayload {
+  organization: SupportOrganizationSummary;
+  queue_health: SupportQueueHealth;
+  entitlement_violations: EntitlementViolation[];
+  required_actions: string[];
+  invitations: Invitation[];
+  recent_billing_events: BillingEventEntry[];
+  failed_email_deliveries: NotificationLogEntry[];
+  failed_webhook_deliveries: WebhookDeliveryEntry[];
+  recent_audit_logs: AuditLogEntry[];
 }
 
 export interface ResolvedCustomDomain {
@@ -431,7 +605,46 @@ export const PLAN_MONITOR_LIMITS: Record<OrganizationPlan, number | null> = {
   team: null,
 };
 
+export const PLAN_FEATURES: Record<OrganizationPlan, BillingEntitlements> = {
+  free: {
+    max_monitors: 3,
+    custom_domain_enabled: false,
+    outbound_webhooks_enabled: false,
+    priority_support: false,
+  },
+  pro: {
+    max_monitors: 20,
+    custom_domain_enabled: true,
+    outbound_webhooks_enabled: true,
+    priority_support: false,
+  },
+  team: {
+    max_monitors: null,
+    custom_domain_enabled: true,
+    outbound_webhooks_enabled: true,
+    priority_support: true,
+  },
+};
+
 export function formatPlanMonitorLimit(plan: OrganizationPlan): string {
   const limit = PLAN_MONITOR_LIMITS[plan];
   return limit === null ? "Unlimited" : String(limit);
+}
+
+export function formatOrganizationPlan(plan: OrganizationPlan): string {
+  return plan.charAt(0).toUpperCase() + plan.slice(1);
+}
+
+export function formatSubscriptionStatus(status: SubscriptionStatus): string {
+  return status
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+}
+
+export function formatDowngradeState(state: DowngradeState | null | undefined): string {
+  return (state || "none")
+    .split("_")
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
 }

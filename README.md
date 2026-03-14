@@ -1,8 +1,9 @@
 # StatusPage.sh
 
 Open-source status page platform with automated monitoring. The current repo is
-focused on a launchable self-hosted core; operator hardening is still underway,
-and commercial billing or hosted-plan workflows are not shipped yet.
+focused on a launchable self-hosted core plus an early managed paid beta path.
+Operator hardening is still underway, and the managed SaaS scope is intentionally
+limited to GitHub-first auth, shared multi-tenant hosting, and self-serve upgrades.
 
 [![CI](https://github.com/saagar210/StatusPage/actions/workflows/ci.yml/badge.svg)](https://github.com/saagar210/StatusPage/actions/workflows/ci.yml)
 
@@ -15,6 +16,7 @@ and commercial billing or hosted-plan workflows are not shipped yet.
 - **Email Subscribers + Webhooks** — Subscriber verification, SMTP delivery, signed webhook delivery, retry, and admin activity visibility
 - **Authenticated Dashboard** — Manage services, incidents, and monitors through an authenticated dashboard
 - **Self-Hostable Core** — MIT licensed core with a local Docker-backed development stack
+- **Managed Paid Beta Billing** — Free / Pro / Team plans with self-serve upgrades, Stripe portal access, and plan-gated custom domains plus outbound webhooks
 - **Auth via GitHub OAuth** — Secure authentication using Auth.js v5
 
 ## Tech Stack
@@ -148,12 +150,46 @@ pnpm setup:local
 # Run the canonical repo verification commands
 pnpm verify
 
+# Run the managed-product verification layer
+pnpm verify:managed
+
 # Prove subscriber verification + incident email delivery locally
 pnpm smoke:email
 
 # Prove generic webhook delivery locally
 pnpm smoke:webhooks
+
+# Prove the managed onboarding + operator-support path locally
+pnpm smoke:managed
 ```
+
+### Managed beta billing
+
+The hosted/managed product path currently targets a paid beta with these plan rules:
+
+- `Free`: up to 3 monitors, no custom domain, no outbound webhooks
+- `Pro`: up to 20 monitors, custom domain enabled, outbound webhooks enabled
+- `Team`: unlimited monitors, custom domain enabled, outbound webhooks enabled, priority support handling
+
+What is shipped in this repo today:
+
+- Self-serve Stripe checkout for upgrades
+- Stripe billing portal handoff for payment-method and cancellation management
+- In-app plan state, subscription status, and entitlement visibility
+- API enforcement for monitor limits, custom-domain access, and outbound webhook access
+- Invitation-based teammate access with GitHub-email matching on acceptance
+- Product-sent invitation emails plus invitation lifecycle visibility in settings and the support console
+- Custom-domain verification checks against the configured managed target
+- Internal operator/support endpoints plus a dashboard support console guarded by `INTERNAL_ADMIN_TOKEN`
+- Audit logs for billing sync, invitation lifecycle, webhook management, custom-domain verification, and operator retries
+- Pre-GA downgrade lifecycle with grace windows, warning emails, non-destructive enforcement, and operator controls
+
+What is still intentionally limited for the beta:
+
+- GitHub is the only customer auth provider
+- Live Stripe validation in staging/production still needs real external credentials and webhook delivery
+- Managed onboarding is now multi-step, but cross-session draft persistence is still out of scope
+- The internal support console is intentionally token-gated rather than a separate operator identity system
 
 ### Production Scaffold
 
@@ -196,7 +232,7 @@ cargo fmt --all
 
 # Next.js
 pnpm --filter web build
-pnpm --filter web test        # Vitest (41 tests)
+pnpm --filter web test        # Vitest (56 tests)
 pnpm --filter web typecheck
 pnpm e2e:auth                # deterministic authenticated Playwright flow (requires Docker)
 ```
@@ -267,7 +303,8 @@ Supporting files:
 - [~] Webhooks (generic delivery, signing, retry, and dashboard retry actions are in place; provider-specific formatting and deeper drill-down are still pending)
 - [ ] Multi-region monitoring
 - [~] Custom domains for status pages are wired through dashboard settings, public routing, and email links; live DNS/TLS proof is still an operator task
-- [ ] Stripe billing integration (not shipped in the current self-hosted build)
+- [x] Stripe billing integration now supports managed-beta upgrades, portal access, plan-gated entitlements, and a pre-GA downgrade lifecycle with grace-period enforcement
+- [x] Invitation-based teammate access, invite email delivery, custom-domain verification, and a multi-step managed onboarding flow are now shipped in the repo
 - [~] Status page branding baseline exists in organization settings; advanced themes are still pending
 - [ ] SMS and provider-specific notification channels
 
@@ -285,7 +322,26 @@ The Rust API exposes the following endpoints:
 - `POST /api/organizations/:slug/members` — Add an existing user to the org (admin+)
 - `PATCH /api/organizations/:slug/members/:id` — Change member role (admin+)
 - `DELETE /api/organizations/:slug/members/:id` — Remove a member (admin+)
-- `GET /api/organizations/:slug/billing` — Billing capability summary for the current deployment
+- `GET /api/organizations/:slug/billing` — Billing summary, subscription state, and entitlements
+- `POST /api/organizations/:slug/billing/checkout` — Start a Stripe checkout session for an allowed upgrade
+- `POST /api/organizations/:slug/billing/portal` — Start a Stripe billing portal session
+- `GET /api/organizations/:slug/entitlements` — Get plan-driven entitlement flags for the org
+- `POST /api/organizations/:slug/custom-domain/verify` — Check whether a custom domain resolves to the managed target
+- `GET /api/organizations/:slug/invitations` — List invitations and delivery state
+- `POST /api/organizations/:slug/invitations` — Create a teammate invitation
+- `DELETE /api/organizations/:slug/invitations/:id` — Cancel a pending invitation
+- `POST /api/organizations/:slug/invitations/:id/resend` — Re-send a pending invitation email
+- `POST /api/invitations/:token/accept` — Accept an invitation with the signed-in GitHub account
+- `POST /api/billing/stripe/webhook` — Process Stripe checkout and subscription webhooks
+- `GET /api/admin/queue-health` — Internal operator queue and billing-event summary (`x-statuspage-admin-token`)
+- `GET /api/admin/organizations/search?q=...` — Internal operator managed-org search (`x-statuspage-admin-token`)
+- `GET /api/admin/organizations/:slug/support` — Internal operator org support summary (`x-statuspage-admin-token`)
+- `POST /api/admin/organizations/:slug/billing/sync` — Internal operator Stripe sync (`x-statuspage-admin-token`)
+- `POST /api/admin/organizations/:slug/downgrade/enforce` — Internal operator downgrade enforcement (`x-statuspage-admin-token`)
+- `POST /api/admin/organizations/:slug/downgrade/cancel` — Internal operator downgrade cancel (`x-statuspage-admin-token`)
+- `POST /api/admin/organizations/:slug/invitations/:id/resend` — Internal operator invite resend (`x-statuspage-admin-token`)
+- `POST /api/admin/organizations/:slug/retry/email/:id` — Internal operator retry for a failed email delivery (`x-statuspage-admin-token`)
+- `POST /api/admin/organizations/:slug/retry/webhook/:id` — Internal operator retry for a failed webhook delivery (`x-statuspage-admin-token`)
 
 ### Services
 

@@ -9,16 +9,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type {
   BillingSummary,
+  Invitation,
   MemberRole,
   MemberWithUser,
   NotificationLogEntry,
   NotificationPreferences,
   Organization,
+  OrganizationPlan,
   SubscriberListItem,
   WebhookConfig,
   WebhookDeliveryEntry,
 } from "@/lib/types";
-import { formatPlanMonitorLimit } from "@/lib/types";
+import {
+  formatDowngradeState,
+  PLAN_FEATURES,
+  formatOrganizationPlan,
+  formatPlanMonitorLimit,
+  formatSubscriptionStatus,
+} from "@/lib/types";
 import { toast } from "sonner";
 
 const WEBHOOK_EVENT_OPTIONS = [
@@ -97,12 +105,31 @@ export default function SettingsPage() {
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(
     null,
   );
+  const [billingActionState, setBillingActionState] = useState<string | null>(
+    null,
+  );
   const [members, setMembers] = useState<MemberWithUser[]>([]);
+  const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [memberLoading, setMemberLoading] = useState(false);
   const [memberActionState, setMemberActionState] = useState<{
     id: string;
     action: "role" | "remove";
   } | null>(null);
+  const [invitationActionState, setInvitationActionState] = useState<{
+    id: string;
+    action: "copy" | "cancel" | "resend";
+  } | null>(null);
+  const [domainVerification, setDomainVerification] = useState<{
+    loading: boolean;
+    message: string | null;
+    is_ready: boolean;
+    expected_target: string | null;
+  }>({
+    loading: false,
+    message: null,
+    is_ready: false,
+    expected_target: null,
+  });
   const [newMember, setNewMember] = useState<{
     email: string;
     role: MemberRole;
@@ -165,6 +192,7 @@ export default function SettingsPage() {
           billingRes,
           webhooksRes,
           membersRes,
+          invitationsRes,
           subscribersRes,
           emailDeliveriesRes,
           webhookDeliveriesRes,
@@ -175,6 +203,7 @@ export default function SettingsPage() {
           fetch(`/api/proxy/api/organizations/${slug}/billing`),
           fetch(`/api/proxy/api/organizations/${slug}/notifications/webhooks`),
           fetch(`/api/proxy/api/organizations/${slug}/members`),
+          fetch(`/api/proxy/api/organizations/${slug}/invitations`),
           fetch(`/api/proxy/api/organizations/${slug}/notifications/subscribers`),
           fetch(`/api/proxy/api/organizations/${slug}/notifications/deliveries/email${emailQuery}`),
           fetch(
@@ -197,6 +226,9 @@ export default function SettingsPage() {
         if (!membersRes.ok) {
           throw new Error("Failed to load team members");
         }
+        if (!invitationsRes.ok) {
+          throw new Error("Failed to load invitations");
+        }
         if (!subscribersRes.ok) {
           throw new Error("Failed to load subscribers");
         }
@@ -213,6 +245,7 @@ export default function SettingsPage() {
           billingBody,
           webhooksBody,
           membersBody,
+          invitationsBody,
           subscribersBody,
           emailDeliveriesBody,
           webhookDeliveriesBody,
@@ -222,6 +255,7 @@ export default function SettingsPage() {
           billingRes.json(),
           webhooksRes.json(),
           membersRes.json(),
+          invitationsRes.json(),
           subscribersRes.json(),
           emailDeliveriesRes.json(),
           webhookDeliveriesRes.json(),
@@ -237,6 +271,7 @@ export default function SettingsPage() {
         setBillingSummary(billingBody.data);
         setWebhooks(webhooksBody.data);
         setMembers(membersBody.data);
+        setInvitations(invitationsBody.data);
         setSubscribers(subscribersBody.data);
         setEmailDeliveries(emailDeliveriesBody.data);
         setWebhookDeliveries(webhookDeliveriesBody.data);
@@ -344,6 +379,57 @@ export default function SettingsPage() {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function startCheckout(plan: OrganizationPlan) {
+    setBillingActionState(`checkout:${plan}`);
+
+    try {
+      const res = await fetch(
+        `/api/proxy/api/organizations/${slug}/billing/checkout`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan }),
+        },
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || "Failed to start upgrade");
+      }
+
+      const body = await res.json();
+      window.location.assign(body.data.url);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to start upgrade",
+      );
+      setBillingActionState(null);
+    }
+  }
+
+  async function openBillingPortal() {
+    setBillingActionState("portal");
+
+    try {
+      const res = await fetch(`/api/proxy/api/organizations/${slug}/billing/portal`, {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || "Failed to open billing portal");
+      }
+
+      const body = await res.json();
+      window.location.assign(body.data.url);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to open billing portal",
+      );
+      setBillingActionState(null);
     }
   }
 
@@ -636,12 +722,62 @@ export default function SettingsPage() {
     }));
   }
 
+  async function verifyCustomDomain() {
+    setDomainVerification((current) => ({
+      ...current,
+      loading: true,
+      message: null,
+    }));
+
+    try {
+      const res = await fetch(
+        `/api/proxy/api/organizations/${slug}/custom-domain/verify`,
+        {
+          method: "POST",
+        },
+      );
+
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error?.message || "Failed to verify custom domain");
+      }
+
+      setOrg((current) =>
+        current
+          ? {
+              ...current,
+              custom_domain_verified_at: body.data.is_ready
+                ? new Date().toISOString()
+                : current.custom_domain_verified_at,
+            }
+          : current,
+      );
+      setDomainVerification({
+        loading: false,
+        message: body.data.message,
+        is_ready: body.data.is_ready,
+        expected_target: body.data.expected_target,
+      });
+      toast.success(body.data.message);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to verify custom domain";
+      setDomainVerification({
+        loading: false,
+        message,
+        is_ready: false,
+        expected_target: null,
+      });
+      toast.error(message);
+    }
+  }
+
   async function createMember(e: React.FormEvent) {
     e.preventDefault();
     setMemberLoading(true);
 
     try {
-      const res = await fetch(`/api/proxy/api/organizations/${slug}/members`, {
+      const res = await fetch(`/api/proxy/api/organizations/${slug}/invitations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -652,19 +788,94 @@ export default function SettingsPage() {
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error?.message || "Failed to add team member");
+        throw new Error(err.error?.message || "Failed to create invitation");
       }
 
       const body = await res.json();
-      setMembers((current) => [...current, body.data]);
+      setInvitations((current) => [body.data, ...current]);
       setNewMember({ email: "", role: "member" });
-      toast.success("Team member added");
+      toast.success("Invitation created");
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to add team member",
+        error instanceof Error ? error.message : "Failed to create invitation",
       );
     } finally {
       setMemberLoading(false);
+    }
+  }
+
+  async function copyInvitationLink(invitation: Invitation) {
+    setInvitationActionState({ id: invitation.id, action: "copy" });
+
+    try {
+      const link = `${window.location.origin}/invite/${invitation.token}`;
+      await navigator.clipboard.writeText(link);
+      toast.success("Invitation link copied");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to copy invitation link",
+      );
+    } finally {
+      setInvitationActionState(null);
+    }
+  }
+
+  async function deleteInvitation(invitation: Invitation) {
+    setInvitationActionState({ id: invitation.id, action: "cancel" });
+
+    try {
+      const res = await fetch(
+        `/api/proxy/api/organizations/${slug}/invitations/${invitation.id}`,
+        {
+          method: "DELETE",
+        },
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || "Failed to cancel invitation");
+      }
+
+      setInvitations((current) =>
+        current.filter((item) => item.id !== invitation.id),
+      );
+      toast.success("Invitation canceled");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to cancel invitation",
+      );
+    } finally {
+      setInvitationActionState(null);
+    }
+  }
+
+  async function resendInvitation(invitation: Invitation) {
+    setInvitationActionState({ id: invitation.id, action: "resend" });
+
+    try {
+      const res = await fetch(
+        `/api/proxy/api/organizations/${slug}/invitations/${invitation.id}/resend`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || "Failed to resend invitation");
+      }
+
+      const body = await res.json();
+      setInvitations((current) =>
+        current.map((item) => (item.id === invitation.id ? body.data : item)),
+      );
+      toast.success("Invitation email queued");
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Failed to resend invitation",
+      );
+    } finally {
+      setInvitationActionState(null);
     }
   }
 
@@ -731,6 +942,16 @@ export default function SettingsPage() {
     return <div className="text-muted-foreground">{loadError ?? "Loading..."}</div>;
   }
 
+  const entitlements = billingSummary?.entitlements ?? PLAN_FEATURES[org.plan];
+  const customDomainLocked = !entitlements.custom_domain_enabled;
+  const webhooksLocked = !entitlements.outbound_webhooks_enabled;
+  const billingConfigured = Boolean(billingSummary?.billing_enabled);
+  const upgradeOptions = billingSummary?.available_upgrades ?? [];
+  const currentPlan = billingSummary?.current_plan ?? org.plan;
+  const subscriptionStatus =
+    billingSummary?.subscription_status ?? org.subscription_status;
+  const downgradeState = billingSummary?.downgrade_state ?? org.downgrade_state;
+
   return (
     <div className="max-w-4xl space-y-6">
       <h1 className="text-3xl font-bold">Settings</h1>
@@ -743,12 +964,28 @@ export default function SettingsPage() {
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">Current plan</span>
             <Badge variant="secondary" className="uppercase">
-              {org.plan}
+              {formatOrganizationPlan(org.plan)}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
             Monitors: {monitorCount ?? "..."} / {formatPlanMonitorLimit(org.plan)}
           </p>
+          <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-3">
+            <div>
+              Custom domains:{" "}
+              {entitlements.custom_domain_enabled ? "Included" : "Upgrade required"}
+            </div>
+            <div>
+              Outbound webhooks:{" "}
+              {entitlements.outbound_webhooks_enabled
+                ? "Included"
+                : "Upgrade required"}
+            </div>
+            <div>
+              Priority support:{" "}
+              {entitlements.priority_support ? "Included" : "Not included"}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -757,38 +994,113 @@ export default function SettingsPage() {
           <CardTitle>Billing Status</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {downgradeState !== "none" ? (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4 text-sm">
+              <p className="font-medium">
+                Downgrade state: {formatDowngradeState(downgradeState)}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                {billingSummary?.downgrade_target_plan
+                  ? `Target plan: ${formatOrganizationPlan(billingSummary.downgrade_target_plan)}.`
+                  : "No lower-plan target is currently set."}{" "}
+                {billingSummary?.downgrade_grace_ends_at
+                  ? `Grace ends ${formatDateLabel(billingSummary.downgrade_grace_ends_at)}.`
+                  : ""}
+              </p>
+              {billingSummary?.required_actions?.length ? (
+                <div className="mt-3 space-y-1 text-muted-foreground">
+                  {billingSummary.required_actions.map((action) => (
+                    <p key={action}>- {action}</p>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
           <p className="text-sm text-muted-foreground">
-            This build exposes plan metadata and Stripe environment readiness
-            only. Customer checkout, portal actions, and in-app plan changes
-            are not shipped in the current self-hosted flow.
+            Managed billing supports self-serve upgrades, Stripe billing management,
+            and a non-destructive downgrade grace period before lower-plan limits are enforced.
           </p>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary" className="uppercase">
-              {billingSummary?.current_plan ?? org.plan}
+              {formatOrganizationPlan(currentPlan)}
+            </Badge>
+            <Badge variant={billingConfigured ? "secondary" : "outline"}>
+              {billingConfigured ? "Billing configured" : "Billing not configured"}
             </Badge>
             <Badge
-              variant={billingSummary?.billing_enabled ? "secondary" : "outline"}
+              variant={
+                subscriptionStatus === "active" || subscriptionStatus === "trialing"
+                  ? "secondary"
+                  : "outline"
+              }
             >
-              {billingSummary?.billing_enabled
-                ? "Stripe env detected"
-                : "Stripe env not configured"}
+              {formatSubscriptionStatus(subscriptionStatus)}
             </Badge>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Checkout wiring:{" "}
-            {billingSummary?.checkout_enabled ? "configured" : "not configured"}{" "}
-            • Portal wiring:{" "}
-            {billingSummary?.portal_enabled ? "configured" : "not configured"}
-          </p>
+          <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+            <div>
+              Billing email: {billingSummary?.billing_email ?? "Not set yet"}
+            </div>
+            <div>
+              Renewal / period end:{" "}
+              {formatDateLabel(billingSummary?.current_period_end) ?? "Not available yet"}
+            </div>
+            <div>
+              Customer record:{" "}
+              {billingSummary?.stripe_customer_id ? "Connected" : "Not created yet"}
+            </div>
+            <div>
+              Cancellation:{" "}
+              {billingSummary?.cancel_at_period_end
+                ? "Ends at the current period"
+                : "No cancellation scheduled"}
+            </div>
+          </div>
           {billingSummary?.stripe_customer_id ? (
             <p className="text-xs text-muted-foreground">
               Stripe customer: {billingSummary.stripe_customer_id}
             </p>
           ) : null}
+          <div className="flex flex-wrap gap-2">
+            {upgradeOptions.map((plan) => (
+              <Button
+                key={plan}
+                type="button"
+                disabled={!billingSummary?.checkout_enabled || billingActionState !== null}
+                onClick={() => startCheckout(plan)}
+              >
+                {billingActionState === `checkout:${plan}`
+                  ? "Redirecting..."
+                  : `Upgrade to ${formatOrganizationPlan(plan)}`}
+              </Button>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!billingSummary?.portal_enabled || billingActionState !== null}
+              onClick={openBillingPortal}
+            >
+              {billingActionState === "portal" ? "Opening..." : "Manage billing"}
+            </Button>
+          </div>
+          {upgradeOptions.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {currentPlan === "team"
+                ? "You are already on the highest managed beta plan."
+                : "No higher plans are configured for this deployment yet."}
+            </p>
+          ) : null}
           <p className="text-xs text-muted-foreground">
-            Deployment summary only. Any upgrade path shown here is informational
-            until Stripe-backed plan changes are implemented.
+            Portal access requires Stripe to be configured and this organization
+            to have a customer record already.
           </p>
+          {billingSummary?.entitlement_violations?.length ? (
+            <div className="space-y-2 rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+              {billingSummary.entitlement_violations.map((violation) => (
+                <p key={violation.code}>{violation.message}</p>
+              ))}
+            </div>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -842,10 +1154,44 @@ export default function SettingsPage() {
                 value={customDomain}
                 onChange={(e) => setCustomDomain(e.target.value)}
                 placeholder="status.example.com"
+                disabled={customDomainLocked}
               />
               <p className="text-xs text-muted-foreground">
-                Leave blank to keep using the default `/s/{org.slug}` URL.
+                {customDomainLocked
+                  ? "Custom domains unlock on Pro and Team plans. Upgrade to connect one."
+                  : "Leave blank to keep using the default `/s/{org.slug}` URL."}
               </p>
+              {!customDomainLocked && customDomain.trim() ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge
+                    variant={org.custom_domain_status === "verified" ? "secondary" : "outline"}
+                  >
+                    {org.custom_domain_status === "blocked_by_plan"
+                      ? "Blocked by plan"
+                      : org.custom_domain_status === "verified"
+                        ? "Verified"
+                        : "Verification pending"}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={verifyCustomDomain}
+                    disabled={domainVerification.loading}
+                  >
+                    {domainVerification.loading ? "Verifying..." : "Verify Domain"}
+                  </Button>
+                  {domainVerification.expected_target ? (
+                    <span className="text-xs text-muted-foreground">
+                      Point DNS at {domainVerification.expected_target}
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+              {domainVerification.message ? (
+                <p className="text-xs text-muted-foreground">
+                  {domainVerification.message}
+                </p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label htmlFor="color">Brand Color</Label>
@@ -878,7 +1224,8 @@ export default function SettingsPage() {
         <CardContent className="space-y-6">
           <p className="text-sm text-muted-foreground">
             Owners and admins can manage who has access to this organization.
-            Members must sign in at least once before they can be added here.
+            Invite teammates by email, then have them accept with the matching
+            GitHub account.
           </p>
 
           <div className="space-y-4">
@@ -943,7 +1290,7 @@ export default function SettingsPage() {
           </div>
 
           <form onSubmit={createMember} className="space-y-4 rounded-lg border p-4">
-            <h2 className="font-medium">Add member</h2>
+            <h2 className="font-medium">Invite teammate</h2>
             <div className="space-y-2">
               <Label htmlFor="member-email">User email</Label>
               <Input
@@ -979,9 +1326,84 @@ export default function SettingsPage() {
               </select>
             </div>
             <Button type="submit" disabled={memberLoading}>
-              {memberLoading ? "Adding..." : "Add Member"}
+              {memberLoading ? "Inviting..." : "Send Invite"}
             </Button>
           </form>
+
+          <div className="space-y-4 rounded-lg border p-4">
+            <h2 className="font-medium">Pending invitations</h2>
+            {invitations.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No pending invitations right now.
+              </p>
+            ) : (
+              invitations.map((invitation) => (
+                <div
+                  key={invitation.id}
+                  className="flex flex-col gap-3 rounded-lg border p-4 lg:flex-row lg:items-center lg:justify-between"
+                >
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{invitation.email}</p>
+                      <Badge variant="outline" className="uppercase">
+                        {invitation.role}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Invited by {invitation.inviter_name || invitation.inviter_email} •
+                      {" "}Expires {formatDateLabel(invitation.expires_at)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Delivery: {invitation.delivery_status}
+                      {invitation.last_sent_at
+                        ? ` • Last sent ${formatDateLabel(invitation.last_sent_at)}`
+                        : ""}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={
+                        invitationActionState?.id === invitation.id ||
+                        !["pending", "delivery_failed"].includes(
+                          invitation.delivery_status,
+                        )
+                      }
+                      onClick={() => resendInvitation(invitation)}
+                    >
+                      {invitationActionState?.id === invitation.id &&
+                      invitationActionState.action === "resend"
+                        ? "Resending..."
+                        : "Resend Invite"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={invitationActionState?.id === invitation.id}
+                      onClick={() => copyInvitationLink(invitation)}
+                    >
+                      {invitationActionState?.id === invitation.id &&
+                      invitationActionState.action === "copy"
+                        ? "Copying..."
+                        : "Copy Invite Link"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      disabled={invitationActionState?.id === invitation.id}
+                      onClick={() => deleteInvitation(invitation)}
+                    >
+                      {invitationActionState?.id === invitation.id &&
+                      invitationActionState.action === "cancel"
+                        ? "Canceling..."
+                        : "Cancel Invite"}
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -1037,6 +1459,7 @@ export default function SettingsPage() {
               <PreferenceToggle
                 label="Webhook when an incident starts"
                 checked={preferences.webhook_on_incident_created}
+                disabled={webhooksLocked}
                 onCheckedChange={(checked) =>
                   updatePreference("webhook_on_incident_created", checked)
                 }
@@ -1044,6 +1467,7 @@ export default function SettingsPage() {
               <PreferenceToggle
                 label="Webhook when an incident is updated"
                 checked={preferences.webhook_on_incident_updated}
+                disabled={webhooksLocked}
                 onCheckedChange={(checked) =>
                   updatePreference("webhook_on_incident_updated", checked)
                 }
@@ -1051,6 +1475,7 @@ export default function SettingsPage() {
               <PreferenceToggle
                 label="Webhook when an incident is resolved"
                 checked={preferences.webhook_on_incident_resolved}
+                disabled={webhooksLocked}
                 onCheckedChange={(checked) =>
                   updatePreference("webhook_on_incident_resolved", checked)
                 }
@@ -1058,10 +1483,16 @@ export default function SettingsPage() {
               <PreferenceToggle
                 label="Webhook when service status changes"
                 checked={preferences.webhook_on_service_status_changed}
+                disabled={webhooksLocked}
                 onCheckedChange={(checked) =>
                   updatePreference("webhook_on_service_status_changed", checked)
                 }
               />
+              {webhooksLocked ? (
+                <p className="text-xs text-muted-foreground">
+                  Outbound webhooks unlock on Pro and Team plans.
+                </p>
+              ) : null}
             </div>
 
             <div className="space-y-3">
@@ -1388,6 +1819,11 @@ export default function SettingsPage() {
             events with signed delivery and retry behavior. Recent outcomes now
             appear above so you can debug failures without leaving the dashboard.
           </p>
+          {webhooksLocked ? (
+            <p className="text-sm text-muted-foreground">
+              Upgrade to Pro or Team to create or re-enable outbound webhooks.
+            </p>
+          ) : null}
           <div className="space-y-4">
             {webhooks.length === 0 ? (
               <p className="text-sm text-muted-foreground">
@@ -1418,7 +1854,7 @@ export default function SettingsPage() {
                     <Button
                       type="button"
                       variant="outline"
-                      disabled={webhookLoading}
+                      disabled={webhookLoading || (webhooksLocked && !webhook.is_enabled)}
                       onClick={() => toggleWebhook(webhook)}
                     >
                       {webhook.is_enabled ? "Disable" : "Enable"}
@@ -1452,6 +1888,7 @@ export default function SettingsPage() {
                 }
                 placeholder="Slack bridge"
                 required
+                disabled={webhooksLocked}
               />
             </div>
             <div className="space-y-2">
@@ -1468,6 +1905,7 @@ export default function SettingsPage() {
                 }
                 placeholder="https://example.com/webhooks/statuspage"
                 required
+                disabled={webhooksLocked}
               />
             </div>
             <div className="space-y-2">
@@ -1483,6 +1921,7 @@ export default function SettingsPage() {
                 }
                 placeholder="At least 8 characters"
                 required
+                disabled={webhooksLocked}
               />
             </div>
             <div className="space-y-3">
@@ -1493,6 +1932,7 @@ export default function SettingsPage() {
                     key={eventType.value}
                     label={eventType.label}
                     checked={newWebhook.event_types.includes(eventType.value)}
+                    disabled={webhooksLocked}
                     onCheckedChange={(checked) =>
                       toggleWebhookEvent(eventType.value, checked)
                     }
@@ -1500,8 +1940,12 @@ export default function SettingsPage() {
                 ))}
               </div>
             </div>
-            <Button type="submit" disabled={webhookLoading}>
-              {webhookLoading ? "Saving..." : "Create Webhook"}
+            <Button type="submit" disabled={webhookLoading || webhooksLocked}>
+              {webhookLoading
+                ? "Saving..."
+                : webhooksLocked
+                  ? "Upgrade to unlock webhooks"
+                  : "Create Webhook"}
             </Button>
           </form>
         </CardContent>
@@ -1513,23 +1957,47 @@ export default function SettingsPage() {
 function PreferenceToggle({
   label,
   checked,
+  disabled = false,
   onCheckedChange,
 }: {
   label: string;
   checked: boolean;
+  disabled?: boolean;
   onCheckedChange: (checked: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 rounded-md border p-3 text-sm">
+    <label
+      className={`flex items-center justify-between gap-3 rounded-md border p-3 text-sm ${
+        disabled ? "cursor-not-allowed opacity-60" : ""
+      }`}
+    >
       <span>{label}</span>
       <input
         type="checkbox"
         checked={checked}
+        disabled={disabled}
         onChange={(e) => onCheckedChange(e.target.checked)}
         className="h-4 w-4"
       />
     </label>
   );
+}
+
+function formatDateLabel(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return parsed.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function DeliveryStatusFilter({

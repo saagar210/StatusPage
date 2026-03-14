@@ -18,6 +18,8 @@ import type {
   CreateMonitorRequest,
   UpdateMonitorRequest,
   MonitorCheck,
+  BillingSummary,
+  Invitation,
   NotificationPreferences,
   UpdateNotificationPreferencesRequest,
   WebhookConfig,
@@ -121,6 +123,13 @@ export async function getOrganization(slug: string): Promise<Organization> {
   return res.data;
 }
 
+export async function getBillingSummary(slug: string): Promise<BillingSummary> {
+  const res = await fetchApi<ApiResponse<BillingSummary>>(
+    `/api/organizations/${slug}/billing`,
+  );
+  return res.data;
+}
+
 export async function updateOrganization(
   slug: string,
   data: UpdateOrganizationRequest,
@@ -140,6 +149,13 @@ export async function updateOrganization(
 export async function getServices(slug: string): Promise<Service[]> {
   const res = await fetchApi<ApiResponse<Service[]>>(
     `/api/organizations/${slug}/services`,
+  );
+  return res.data;
+}
+
+export async function getInvitations(slug: string): Promise<Invitation[]> {
+  const res = await fetchApi<ApiResponse<Invitation[]>>(
+    `/api/organizations/${slug}/invitations`,
   );
   return res.data;
 }

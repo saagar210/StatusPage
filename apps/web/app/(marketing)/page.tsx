@@ -45,8 +45,9 @@ export default async function LandingPage() {
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
             Monitor your services, communicate incidents, and keep your users
-            informed. Self-host the open-source core today. Managed billing and
-            hosted-plan workflows are still in progress.
+            informed. Self-host the open-source core today, or run the early
+            managed paid beta with GitHub-first auth, Stripe upgrades, and
+            plan-gated custom domains plus outbound webhooks.
           </p>
           <div className="mt-10 flex items-center justify-center gap-4">
             <Button asChild size="lg">
