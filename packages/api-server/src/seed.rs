@@ -246,17 +246,17 @@ async fn main() -> anyhow::Result<()> {
         (
             service_ids[0].0,
             "http",
-            serde_json::json!({"url": "https://api.example.com/health", "method": "GET", "expected_status": 200, "headers": {}}),
+            serde_json::json!({"type": "http", "url": "https://api.example.com/health", "method": "GET", "expected_status": 200, "headers": {}}),
         ),
         (
             service_ids[1].0,
             "http",
-            serde_json::json!({"url": "https://app.example.com", "method": "GET", "expected_status": 200, "headers": {}}),
+            serde_json::json!({"type": "http", "url": "https://app.example.com", "method": "GET", "expected_status": 200, "headers": {}}),
         ),
         (
             service_ids[2].0,
             "tcp",
-            serde_json::json!({"host": "db.example.com", "port": 5432}),
+            serde_json::json!({"type": "tcp", "host": "db.example.com", "port": 5432}),
         ),
     ];
 
