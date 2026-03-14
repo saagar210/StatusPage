@@ -2,14 +2,17 @@ import { redirect } from "next/navigation";
 import { getOrganizations } from "@/lib/api-client";
 
 export default async function DashboardIndex() {
+  let orgs;
+
   try {
-    const orgs = await getOrganizations();
-    if (orgs.length === 0) {
-      redirect("/dashboard/onboarding");
-    }
-    // Redirect to first org
-    redirect(`/dashboard/${orgs[0]!.slug}`);
+    orgs = await getOrganizations();
   } catch {
     redirect("/dashboard/onboarding");
   }
+
+  if (orgs.length === 0) {
+    redirect("/dashboard/onboarding");
+  }
+
+  redirect(`/dashboard/${orgs[0]!.slug}`);
 }

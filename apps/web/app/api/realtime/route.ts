@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
  * and streams events to the client.
  *
  * Usage from client:
- *   const eventSource = new EventSource('/api/realtime?org_id=...');
+ *   const eventSource = new EventSource('/api/realtime?slug=demo');
  *   eventSource.addEventListener('service:status', (event) => {
  *     const data = JSON.parse(event.data);
  *     // Update UI
