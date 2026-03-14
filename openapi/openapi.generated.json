@@ -4,6 +4,1286 @@
     "title": "Contract Artifact",
     "version": "1.0.0"
   },
-  "paths": {},
-  "components": {}
+  "paths": {
+    "/api/organizations/{slug}/billing": {
+      "get": {
+        "summary": "Get billing summary",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Billing summary for the organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSummaryResponse"
+                },
+                "examples": {
+                  "freeOrg": {
+                    "value": {
+                      "data": {
+                        "billing_enabled": true,
+                        "portal_enabled": false,
+                        "checkout_enabled": true,
+                        "current_plan": "free",
+                        "subscription_status": "inactive",
+                        "stripe_customer_id": null,
+                        "billing_email": "owner@example.com",
+                        "current_period_end": null,
+                        "cancel_at_period_end": false,
+                        "available_upgrades": [
+                          "pro",
+                          "team"
+                        ],
+                        "entitlements": {
+                          "max_monitors": 3,
+                          "custom_domain_enabled": false,
+                          "outbound_webhooks_enabled": false,
+                          "priority_support": false
+                        },
+                        "self_serve_downgrade": false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/api/organizations/{slug}/billing/checkout": {
+      "post": {
+        "summary": "Start Stripe checkout for an allowed upgrade",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckoutRequest"
+              },
+              "examples": {
+                "upgradeToPro": {
+                  "value": {
+                    "plan": "pro"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Stripe checkout session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSessionResponse"
+                },
+                "examples": {
+                  "session": {
+                    "value": {
+                      "data": {
+                        "url": "https://checkout.stripe.com/c/pay/cs_test_123"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/api/organizations/{slug}/billing/portal": {
+      "post": {
+        "summary": "Open the Stripe billing portal",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Stripe portal session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingSessionResponse"
+                },
+                "examples": {
+                  "portal": {
+                    "value": {
+                      "data": {
+                        "url": "https://billing.stripe.com/p/session/test_123"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/api/organizations/{slug}/entitlements": {
+      "get": {
+        "summary": "Get plan entitlements",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Plan entitlement flags for the organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingEntitlementsResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/api/organizations/{slug}/custom-domain/verify": {
+      "post": {
+        "summary": "Verify a custom domain against the managed target",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Custom-domain verification result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CustomDomainVerificationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/api/organizations/{slug}/invitations": {
+      "get": {
+        "summary": "List pending invitations",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Pending invitations for the organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationListResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a teammate invitation",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvitationRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Invitation created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/api/organizations/{slug}/invitations/{id}": {
+      "delete": {
+        "summary": "Cancel a pending invitation",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Invitation deleted"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/api/invitations/{token}/accept": {
+      "post": {
+        "summary": "Accept an invitation with the signed-in GitHub account",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Invitation accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationAcceptResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          },
+          "403": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/api/billing/stripe/webhook": {
+      "post": {
+        "summary": "Process Stripe checkout and subscription webhooks",
+        "parameters": [
+          {
+            "name": "Stripe-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "204": {
+            "description": "Event accepted or safely ignored"
+          },
+          "400": {
+            "$ref": "#/components/responses/ErrorResponse"
+          }
+        }
+      }
+    },
+    "/api/admin/queue-health": {
+      "get": {
+        "summary": "Internal operator queue health summary",
+        "parameters": [
+          {
+            "name": "x-statuspage-admin-token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Queue and billing-event counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueHealthResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/organizations/{slug}/support": {
+      "get": {
+        "summary": "Internal operator support summary for one organization",
+        "parameters": [
+          {
+            "name": "x-statuspage-admin-token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Support summary for the organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportOrganizationResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "OrganizationPlan": {
+        "type": "string",
+        "enum": [
+          "free",
+          "pro",
+          "team"
+        ]
+      },
+      "SubscriptionStatus": {
+        "type": "string",
+        "enum": [
+          "inactive",
+          "checkout_pending",
+          "trialing",
+          "active",
+          "past_due",
+          "canceled",
+          "unpaid",
+          "incomplete",
+          "incomplete_expired"
+        ]
+      },
+      "BillingEntitlements": {
+        "type": "object",
+        "required": [
+          "max_monitors",
+          "custom_domain_enabled",
+          "outbound_webhooks_enabled",
+          "priority_support"
+        ],
+        "properties": {
+          "max_monitors": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "custom_domain_enabled": {
+            "type": "boolean"
+          },
+          "outbound_webhooks_enabled": {
+            "type": "boolean"
+          },
+          "priority_support": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BillingSummary": {
+        "type": "object",
+        "required": [
+          "billing_enabled",
+          "portal_enabled",
+          "checkout_enabled",
+          "current_plan",
+          "subscription_status",
+          "stripe_customer_id",
+          "billing_email",
+          "current_period_end",
+          "cancel_at_period_end",
+          "available_upgrades",
+          "entitlements",
+          "self_serve_downgrade"
+        ],
+        "properties": {
+          "billing_enabled": {
+            "type": "boolean"
+          },
+          "portal_enabled": {
+            "type": "boolean"
+          },
+          "checkout_enabled": {
+            "type": "boolean"
+          },
+          "current_plan": {
+            "$ref": "#/components/schemas/OrganizationPlan"
+          },
+          "subscription_status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
+          },
+          "stripe_customer_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "billing_email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "current_period_end": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "cancel_at_period_end": {
+            "type": "boolean"
+          },
+          "available_upgrades": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationPlan"
+            }
+          },
+          "entitlements": {
+            "$ref": "#/components/schemas/BillingEntitlements"
+          },
+          "self_serve_downgrade": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CheckoutRequest": {
+        "type": "object",
+        "required": [
+          "plan"
+        ],
+        "properties": {
+          "plan": {
+            "$ref": "#/components/schemas/OrganizationPlan"
+          }
+        }
+      },
+      "BillingSession": {
+        "type": "object",
+        "required": [
+          "url"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          }
+        }
+      },
+      "BillingSummaryResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BillingSummary"
+          }
+        }
+      },
+      "BillingEntitlementsResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BillingEntitlements"
+          }
+        }
+      },
+      "BillingSessionResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/BillingSession"
+          }
+        }
+      },
+      "CustomDomainVerification": {
+        "type": "object",
+        "required": [
+          "domain",
+          "expected_target",
+          "resolved_addresses",
+          "expected_addresses",
+          "is_ready",
+          "message"
+        ],
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "expected_target": {
+            "type": "string"
+          },
+          "resolved_addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "expected_addresses": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "is_ready": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "CustomDomainVerificationResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/CustomDomainVerification"
+          }
+        }
+      },
+      "Invitation": {
+        "type": "object",
+        "required": [
+          "id",
+          "org_id",
+          "email",
+          "role",
+          "invited_by",
+          "token",
+          "expires_at",
+          "accepted_at",
+          "created_at",
+          "updated_at",
+          "inviter_name",
+          "inviter_email"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "org_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          },
+          "invited_by": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "token": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "accepted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "inviter_name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inviter_email": {
+            "type": "string"
+          }
+        }
+      },
+      "CreateInvitationRequest": {
+        "type": "object",
+        "required": [
+          "email",
+          "role"
+        ],
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          }
+        }
+      },
+      "InvitationResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Invitation"
+          }
+        }
+      },
+      "InvitationListResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Invitation"
+            }
+          }
+        }
+      },
+      "InvitationAccept": {
+        "type": "object",
+        "required": [
+          "org_slug",
+          "org_name",
+          "role",
+          "message"
+        ],
+        "properties": {
+          "org_slug": {
+            "type": "string"
+          },
+          "org_name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "member"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "InvitationAcceptResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/InvitationAccept"
+          }
+        }
+      },
+      "QueueHealth": {
+        "type": "object",
+        "required": [
+          "pending_email_deliveries",
+          "failed_email_deliveries",
+          "pending_webhook_deliveries",
+          "failed_webhook_deliveries",
+          "recent_billing_events"
+        ],
+        "properties": {
+          "pending_email_deliveries": {
+            "type": "integer"
+          },
+          "failed_email_deliveries": {
+            "type": "integer"
+          },
+          "pending_webhook_deliveries": {
+            "type": "integer"
+          },
+          "failed_webhook_deliveries": {
+            "type": "integer"
+          },
+          "recent_billing_events": {
+            "type": "integer"
+          }
+        }
+      },
+      "QueueHealthResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/QueueHealth"
+          }
+        }
+      },
+      "SupportOrganization": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "plan",
+          "subscription_status",
+          "stripe_customer_id",
+          "stripe_subscription_id",
+          "billing_email",
+          "custom_domain",
+          "custom_domain_verified_at",
+          "member_count",
+          "pending_invitation_count",
+          "subscriber_count",
+          "webhook_count"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "plan": {
+            "$ref": "#/components/schemas/OrganizationPlan"
+          },
+          "subscription_status": {
+            "$ref": "#/components/schemas/SubscriptionStatus"
+          },
+          "stripe_customer_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "stripe_subscription_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "billing_email": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "custom_domain": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "custom_domain_verified_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "member_count": {
+            "type": "integer"
+          },
+          "pending_invitation_count": {
+            "type": "integer"
+          },
+          "subscriber_count": {
+            "type": "integer"
+          },
+          "webhook_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "SupportOrganizationPayload": {
+        "type": "object",
+        "required": [
+          "organization",
+          "queue_health",
+          "recent_billing_events",
+          "failed_email_deliveries",
+          "failed_webhook_deliveries",
+          "recent_audit_logs"
+        ],
+        "properties": {
+          "organization": {
+            "$ref": "#/components/schemas/SupportOrganization"
+          },
+          "queue_health": {
+            "type": "object",
+            "required": [
+              "pending_email_deliveries",
+              "failed_email_deliveries",
+              "pending_webhook_deliveries",
+              "failed_webhook_deliveries"
+            ],
+            "properties": {
+              "pending_email_deliveries": {
+                "type": "integer"
+              },
+              "failed_email_deliveries": {
+                "type": "integer"
+              },
+              "pending_webhook_deliveries": {
+                "type": "integer"
+              },
+              "failed_webhook_deliveries": {
+                "type": "integer"
+              }
+            }
+          },
+          "failed_email_deliveries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "notification_type",
+                "recipient_type",
+                "recipient_email",
+                "subject",
+                "status",
+                "error_message",
+                "attempt_count",
+                "max_attempts",
+                "sent_at",
+                "next_retry_at",
+                "created_at"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "notification_type": {
+                  "type": "string"
+                },
+                "recipient_type": {
+                  "type": "string"
+                },
+                "recipient_email": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "error_message": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "attempt_count": {
+                  "type": "integer"
+                },
+                "max_attempts": {
+                  "type": "integer"
+                },
+                "sent_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "next_retry_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "failed_webhook_deliveries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "webhook_config_id",
+                "webhook_name",
+                "webhook_url",
+                "event_type",
+                "status",
+                "response_status_code",
+                "error_message",
+                "attempt_count",
+                "max_attempts",
+                "next_retry_at",
+                "delivered_at",
+                "created_at"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "webhook_config_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "webhook_name": {
+                  "type": "string"
+                },
+                "webhook_url": {
+                  "type": "string"
+                },
+                "event_type": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "response_status_code": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "error_message": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "attempt_count": {
+                  "type": "integer"
+                },
+                "max_attempts": {
+                  "type": "integer"
+                },
+                "next_retry_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "delivered_at": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "recent_billing_events": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "stripe_event_id",
+                "event_type",
+                "processed_at"
+              ],
+              "properties": {
+                "stripe_event_id": {
+                  "type": "string"
+                },
+                "event_type": {
+                  "type": "string"
+                },
+                "processed_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "recent_audit_logs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "org_id",
+                "actor_user_id",
+                "actor_type",
+                "action",
+                "target_type",
+                "target_id",
+                "details",
+                "created_at"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "org_id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "actor_user_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "uuid"
+                },
+                "actor_type": {
+                  "type": "string"
+                },
+                "action": {
+                  "type": "string"
+                },
+                "target_type": {
+                  "type": "string"
+                },
+                "target_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "details": {
+                  "type": "object"
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          }
+        }
+      },
+      "SupportOrganizationResponse": {
+        "type": "object",
+        "required": [
+          "data"
+        ],
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SupportOrganizationPayload"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": [
+              "code",
+              "message"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "ErrorResponse": {
+        "description": "Structured API error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            },
+            "examples": {
+              "validation": {
+                "value": {
+                  "error": {
+                    "code": "VALIDATION_ERROR",
+                    "message": "Outbound webhooks are available on Pro and Team plans. Upgrade to add one."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
 }
