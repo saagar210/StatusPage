@@ -11,6 +11,7 @@ jobs:
     env:
       CARGO_TERM_COLOR: always
       SQLX_OFFLINE: true
+      CODEX_CACHE_ROOT: ${{ github.workspace }}/.codex-cache
     steps:
       - uses: actions/checkout@v5
         with:
