@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use shared::models::monitor::{Monitor, MonitorConfig};
+use shared::models::monitor::{normalize_monitor_config, Monitor, MonitorConfig};
 use sqlx::PgPool;
 use tokio::sync::Semaphore;
 use tokio::task::JoinHandle;
@@ -172,7 +172,10 @@ async fn run_monitor_loop(
     cancel: CancellationToken,
     publisher: Option<RedisPublisher>,
 ) {
-    let config: MonitorConfig = match serde_json::from_value(monitor.config.clone()) {
+    let config: MonitorConfig = match serde_json::from_value(normalize_monitor_config(
+        monitor.monitor_type,
+        monitor.config.clone(),
+    )) {
         Ok(c) => c,
         Err(e) => {
             tracing::error!(

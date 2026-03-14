@@ -23,4 +23,4 @@ pnpm --filter web build
 
 - Playwright configuration lives in `apps/web/playwright.config.ts`.
 - Public and dashboard data requests proxy through `app/api/proxy/[...path]/route.ts`.
-- Realtime support is still under active implementation; the current SSE route is an interim scaffold, not the final production architecture.
+- Realtime updates currently flow through the web SSE bridge for core org events, but broader event coverage and long-term architecture are still in progress.

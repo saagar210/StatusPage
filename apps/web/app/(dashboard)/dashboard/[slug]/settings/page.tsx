@@ -754,13 +754,13 @@ export default function SettingsPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Billing</CardTitle>
+          <CardTitle>Billing Status</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Billing setup is now environment-aware. This summary shows whether
-            Stripe-backed upgrade and portal flows are configured for this
-            deployment.
+            This build exposes plan metadata and Stripe environment readiness
+            only. Customer checkout, portal actions, and in-app plan changes
+            are not shipped in the current self-hosted flow.
           </p>
           <div className="flex flex-wrap gap-2">
             <Badge variant="secondary" className="uppercase">
@@ -770,28 +770,25 @@ export default function SettingsPage() {
               variant={billingSummary?.billing_enabled ? "secondary" : "outline"}
             >
               {billingSummary?.billing_enabled
-                ? "Billing configured"
-                : "Billing disabled"}
+                ? "Stripe env detected"
+                : "Stripe env not configured"}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
-            Checkout: {billingSummary?.checkout_enabled ? "ready" : "not configured"}{" "}
-            • Portal: {billingSummary?.portal_enabled ? "ready" : "not configured"}
+            Checkout wiring:{" "}
+            {billingSummary?.checkout_enabled ? "configured" : "not configured"}{" "}
+            • Portal wiring:{" "}
+            {billingSummary?.portal_enabled ? "configured" : "not configured"}
           </p>
           {billingSummary?.stripe_customer_id ? (
             <p className="text-xs text-muted-foreground">
               Stripe customer: {billingSummary.stripe_customer_id}
             </p>
           ) : null}
-          {billingSummary && billingSummary.available_upgrades.length > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Available upgrades: {billingSummary.available_upgrades.join(", ")}
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              No higher plan is available for this organization right now.
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground">
+            Deployment summary only. Any upgrade path shown here is informational
+            until Stripe-backed plan changes are implemented.
+          </p>
         </CardContent>
       </Card>
 

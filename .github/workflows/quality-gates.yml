@@ -8,17 +8,29 @@ on:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+      SQLX_OFFLINE: true
+      CODEX_CACHE_ROOT: ${{ github.workspace }}/.codex-cache
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
+      - uses: pnpm/action-setup@v4
+
       - uses: actions/setup-node@v5
         with:
           node-version: 22
 
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+
       - name: Install dependencies
-        run: npm ci || npm install
+        run: pnpm install --frozen-lockfile
 
       - name: Policy checks
         run: node scripts/ci/require-tests-and-docs.mjs
