@@ -8,6 +8,10 @@
 - PostgreSQL is the system of record.
 - Redis is used for realtime fanout and health validation.
 
+For local development, the repo defaults to higher host ports for PostgreSQL and
+Redis so the app does not accidentally connect to an unrelated service already
+running on `5432` or `6379`.
+
 ## Key product flows
 
 ### Dashboard administration
